@@ -36,7 +36,7 @@ class Environment:
         while True:
             x = random.randint(0, self.size - 1)
             y = random.randint(0, self.size - 1)
-            if not self.grid[x][y].pit and not self.grid[x][y].wumpus:
+            if not self.grid[x][y].pit and not self.grid[x][y].wumpus and x != 0 and y != 0:
                 self.grid[x][y].gold = True
                 break
 
