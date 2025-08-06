@@ -26,7 +26,7 @@ def run_random_agent():
 
 
 def run_game():
-    env = Environment(size=8, num_wumpus=1, pit_prob=0.2)
+    env = Environment(size=4, num_wumpus=1, pit_prob=0.2)
     agent = KBWumpusAgent(env)
 
     steps = 0

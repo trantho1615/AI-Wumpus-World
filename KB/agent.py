@@ -2,6 +2,7 @@ from knowledge_base import DynamicKB, breeze_rule, stench_rule
 from planner import astar
 import random
 
+
 class RandomWumpusAgent:
     def __init__(self, env):
         self.env = env
@@ -12,9 +13,10 @@ class RandomWumpusAgent:
         self.bump = False
         self.actions = ["move", "turn_left", "turn_right", "shoot", "grab", "climb"]
         self.arrow_used = False
+        self.last_action_was_shoot = False
 
     def perceive(self, percepts):
-        
+
         self.bump = percepts.get("bump", False)
 
     def choose_action(self):
@@ -45,6 +47,7 @@ class RandomWumpusAgent:
     def _turn_right(self, dir):
         return {"N": "E", "E": "S", "S": "W", "W": "N"}[dir]
 
+
 class KBWumpusAgent:
     def __init__(self, env):
         self.plan = []
@@ -57,36 +60,66 @@ class KBWumpusAgent:
         self.visited = set()
         self.has_gold = False
         self.done = False
+        self.last_action_was_shoot = False
+        self.glitter_detected_at = None
 
     def perceive(self, percepts):
         x, y = self.position
         self.visited.add((x, y))
-        self.kb.assert_fact(("visited", x, y)) 
-
+        self.kb.assert_fact(("visited", x, y))
         self.kb.assert_fact(("safe", x, y))
 
         if percepts["breeze"]:
             self.kb.assert_fact(("breeze", x, y))
         else:
             self.kb.assert_fact(("no_breeze", x, y))
+
         if percepts["glitter"]:
             self.kb.assert_fact(("gold_here", x, y))
+            if not self.has_gold:
+                self.glitter_detected_at = (x, y)
+
         if percepts["stench"]:
             self.kb.assert_fact(("stench", x, y))
         else:
             self.kb.assert_fact(("no_stench", x, y))
-        if percepts["scream"]:
-            print("Scream")
+
+        dx, dy = self._get_delta(self.direction)
+        tx, ty = self.position[0] + dx, self.position[1] + dy
+
+        if self.last_action_was_shoot and percepts.get("scream", False):
+            print(f"Scream heard! Eliminating Wumpus along ({dx}, {dy})")
+            while 0 <= tx < self.env.size and 0 <= ty < self.env.size:
+                self.kb.assert_fact(("no_wumpus", tx, ty))
+                self.kb.assert_fact(("safe", tx, ty))
+                self.kb.facts.discard(("possible_wumpus", tx, ty))
+                tx += dx
+                ty += dy
+            self.kb.facts = {fact for fact in self.kb.facts if fact[0] != "possible_wumpus"}
+
+
+        elif self.last_action_was_shoot and self.env.arrow_used:
+            print("Missed shot — sweeping and marking as safe from Wumpus.")
+            while 0 <= tx < self.env.size and 0 <= ty < self.env.size:
+                print(f"Marking ({tx},{ty}) as safe from Wumpus.")
+                self.kb.assert_fact(("no_wumpus", tx, ty))
+                self.kb.assert_fact(("safe", tx, ty))
+                self.kb.facts = {f for f in self.kb.facts if f != ("possible_wumpus", tx, ty)}
+                tx += dx
+                ty += dy
+
         if percepts["bump"]:
             print(f"Bump detected at {self.position} facing {self.direction}")
-
-            dx, dy = self._get_delta(self.direction)
             nx, ny = self.position[0] + dx, self.position[1] + dy
             if 0 <= nx < self.env.size and 0 <= ny < self.env.size:
                 self.kb.add_fact(("blocked", nx, ny))
-
             if self.plan and self.plan[0] == (nx, ny):
                 self.plan.pop(0)
+
+        if ("gold_here", x, y) in self.kb.facts and not self.has_gold:
+            print(f"Gold detected at {self.position}, grabbing it.")
+            self.has_gold = True
+            self.plan = []
 
         self.kb.infer()
         print("KB Facts:", self.kb.facts)
@@ -112,37 +145,74 @@ class KBWumpusAgent:
             return "N"
         return {"N": "E", "E": "S", "S": "W", "W": "N"}[dir]
 
-
     def choose_action(self):
-        x, y = self.position
+        self.last_action_was_shoot = False
 
-        if not self.has_gold and ("gold_here", x, y) in self.kb.facts:
+        x, y = self.position
+        percepts = self.env.get_percepts(self.position)
+
+        # Grab gold if it's here
+        if not self.has_gold and percepts.get("glitter", False):
             self.has_gold = True
             return "grab"
 
-        if self.has_gold and (x, y) != (0, 0):
-            from planner import astar
-            path = astar(self.position, (0, 0), self.kb, self.env.size)
+        if self.has_gold:
+            if self.position == (0, 0):
+                return "climb"
+            if not self.plan:
+                path = astar(self.position, (0, 0), self.kb, self.env.size)
+                if path:
+                    self.plan = path
+            if self.plan:
+                return self.get_action_towards(self.plan.pop(0))
+
+        if self.glitter_detected_at and not self.has_gold and self.glitter_detected_at != self.position:
+            path = astar(self.position, self.glitter_detected_at, self.kb, self.env.size)
             if path:
                 self.plan = path
+                print(f"Returning to glitter location at {self.glitter_detected_at}, path: {path}")
+                return self.get_action_towards(self.plan.pop(0))
+
+        if percepts.get("stench", False) and not self.env.arrow_used:
+            dx, dy = self._get_delta(self.direction)
+            tx, ty = self.position[0] + dx, self.position[1] + dy
+            if 0 <= tx < self.env.size and 0 <= ty < self.env.size:
+                if ("possible_wumpus", tx, ty) in self.kb.facts:
+                    print(f"Decided to shoot at ({tx}, {ty}) due to stench!")
+                    self.last_action_was_shoot = True
+                    return "shoot"
+
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            nx, ny = self.position[0] + dx, self.position[1] + dy
+            if (0 <= nx < self.env.size and 0 <= ny < self.env.size):
+                if ("safe", nx, ny) in self.kb.facts and (nx, ny) not in self.visited:
+                    print(f"Moving to adjacent unvisited safe cell: ({nx}, {ny})")
+                    return self.get_action_towards((nx, ny))
 
         if self.plan:
-            next_move = self.plan.pop(0)
-            return self.get_action_towards(next_move)
+            next_move = self.plan[0]
+            action = self.get_action_towards(next_move)
+            if action == "move":
+                self.plan.pop(0)
+            return action
 
         for safe_cell in self.kb.get_safe_unvisited():
-            if safe_cell != self.position:
-                from planner import astar
+            if safe_cell != self.position and safe_cell not in self.visited:
                 path = astar(self.position, safe_cell, self.kb, self.env.size)
                 if path:
                     self.plan = path
                     print(f"Planning to explore: {safe_cell}, path: {path}")
                     return self.get_action_towards(self.plan.pop(0))
 
-        if self.position == (0, 0) and self.has_gold:
-            return 'climb'
+        for cell in sorted(self.kb.get_safe_unvisited()):
+            if cell not in self.visited:
+                path = astar(self.position, cell, self.kb, self.env.size)
+                if path:
+                    self.plan = path
+                    print(f"[Fallback] Planning to explore: {cell}, path: {path}")
+                    return self.get_action_towards(self.plan.pop(0))
 
-        return "climb"
+        return "wait"
 
     def get_action_towards(self, target):
         dx = target[0] - self.position[0]
@@ -166,8 +236,3 @@ class KBWumpusAgent:
                 return 'turn_right'
 
         return 'move'
-
-
-
-
-

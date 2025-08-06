@@ -16,14 +16,13 @@ class DynamicKB:
             self.facts.update(new_facts)
 
     def get_safe_unvisited(self):
-        safe = set()
-        visited = set()
+        safe_unvisited = []
         for fact in self.facts:
             if fact[0] == "safe":
-                safe.add((fact[1], fact[2]))
-            elif fact[0] == "visited":
-                visited.add((fact[1], fact[2]))
-        return list(safe - visited)
+                x, y = fact[1], fact[2]
+                if ("visited", x, y) not in self.facts:
+                    safe_unvisited.append((x, y))
+        return safe_unvisited
 
 
 def stench_rule(facts, size):
@@ -64,3 +63,5 @@ def breeze_rule(facts, size):
                     new_facts.add(("no_pit", nx, ny))
                     new_facts.add(("safe", nx, ny))
     return new_facts
+
+

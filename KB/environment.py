@@ -36,7 +36,7 @@ class Environment:
         while True:
             x = random.randint(0, self.size - 1)
             y = random.randint(0, self.size - 1)
-            if not self.grid[x][y].pit and not self.grid[x][y].wumpus and x != 0 and y != 0:
+            if not self.grid[x][y].pit and not self.grid[x][y].wumpus and (x, y) != (0, 0):
                 self.grid[x][y].gold = True
                 break
 
@@ -102,9 +102,11 @@ class Environment:
                 if self.grid[tx][ty].wumpus:
                     self.grid[tx][ty].wumpus = False
                     self.scream = True
+                    print(f">>> Wumpus at ({tx},{ty}) has been eliminated!")
                     break
                 tx += dx
                 ty += dy
+            
 
     def _get_delta(self, direction):
         return {
