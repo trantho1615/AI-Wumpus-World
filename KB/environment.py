@@ -1,4 +1,5 @@
 import random
+import os
 
 class Cell:
     def __init__(self):
@@ -15,12 +16,18 @@ class Environment:
         self.arrow_used = False
         self.scream = False
         self.gold_found = False
+        self.pit_positions = []
+        self.grid_positions = [[(x, y) for x in range(size)] for y in range(size)]
         self.place_pit_and_wumpus(num_wumpus, pit_prob)
         self.place_gold()
+        print(f"pit_positions: {self.pit_positions}")
+        print(f"grid_positions: {self.grid_positions}")
+        # os.system("pause")
 
     def place_pit_and_wumpus(self, num_wumpus, pit_prob):
         candidates = [(x, y) for x in range(self.size) for y in range(self.size) if (x, y) != (0, 0)]
         random.shuffle(candidates)
+        # os.system("pause")
 
         for _ in range(num_wumpus):
             if candidates:
@@ -31,6 +38,11 @@ class Environment:
             for y in range(self.size):
                 if (x, y) != (0, 0) and not self.grid[x][y].wumpus and random.random() < pit_prob:
                     self.grid[x][y].pit = True
+        
+        for x in range(self.size):
+            for y in range(self.size):
+                if self.grid[x][y].pit:
+                    self.pit_positions.append((x, y))
 
     def place_gold(self):
         while True:
