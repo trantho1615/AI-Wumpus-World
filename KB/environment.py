@@ -1,5 +1,6 @@
 import random
-import os
+
+MOVE_COST = 1
 
 class Cell:
     def __init__(self):
@@ -10,24 +11,20 @@ class Cell:
 class Environment:
     def __init__(self, size=4, num_wumpus=2, pit_prob=0.2):
         self.size = size
+        self.score = 0
         self.grid = [[Cell() for _ in range(size)] for _ in range(size)]
         self.agent_position = (0, 0)
         self.agent_direction = "E"  
         self.arrow_used = False
         self.scream = False
         self.gold_found = False
-        self.pit_positions = []
-        self.grid_positions = [[(x, y) for x in range(size)] for y in range(size)]
         self.place_pit_and_wumpus(num_wumpus, pit_prob)
         self.place_gold()
-        print(f"pit_positions: {self.pit_positions}")
-        print(f"grid_positions: {self.grid_positions}")
-        # os.system("pause")
+        self.wall = False
 
     def place_pit_and_wumpus(self, num_wumpus, pit_prob):
         candidates = [(x, y) for x in range(self.size) for y in range(self.size) if (x, y) != (0, 0)]
         random.shuffle(candidates)
-        # os.system("pause")
 
         for _ in range(num_wumpus):
             if candidates:
@@ -38,11 +35,6 @@ class Environment:
             for y in range(self.size):
                 if (x, y) != (0, 0) and not self.grid[x][y].wumpus and random.random() < pit_prob:
                     self.grid[x][y].pit = True
-        
-        for x in range(self.size):
-            for y in range(self.size):
-                if self.grid[x][y].pit:
-                    self.pit_positions.append((x, y))
 
     def place_gold(self):
         while True:
@@ -80,14 +72,23 @@ class Environment:
         if action == "grab":
             if self.grid[x][y].gold:
                 self.grid[x][y].gold = False
+                self.score += 10
                 agent.has_gold = True
 
+
         elif action == "climb":
-            if (x, y) == (0, 0) and agent.has_gold:
+
+            if (x, y) == (0, 0):
+
+                if agent.has_gold:
+                    self.score += 1000
+
                 agent.done = True
 
 
+
         elif action == "move":
+            self.score -= 1
             dx, dy = self._get_delta(agent.direction)
             nx, ny = x + dx, y + dy
             if 0 <= nx < self.size and 0 <= ny < self.size:
@@ -95,16 +96,20 @@ class Environment:
                 agent.bump = False
                 self.check_dead(agent)
             else:
-                agent.bump = True 
+                agent.bump = True
+
 
 
         elif action == "turn_left":
+            self.score -= 1
             agent.direction = self._turn_left(agent.direction)
 
         elif action == "turn_right":
+            self.score -= 1
             agent.direction = self._turn_right(agent.direction)
 
         elif action == "shoot":
+            self.score -= 10
             if self.arrow_used:
                 return
             self.arrow_used = True
@@ -142,6 +147,7 @@ class Environment:
         if cell.wumpus:
             print(f"Killed by Wumpus at ({x},{y})!")
         if cell.pit or cell.wumpus:
+            self.score -= 1000
             agent.done = True
 
     def print_state(self, agent):
