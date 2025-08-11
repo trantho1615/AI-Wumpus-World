@@ -5,9 +5,9 @@ import pygame
 import os
 
 from config import (
-    WIN, TILE_MAPS, N, POSITIONS, MAP, LIGHT, FPS, WIDTH, HEIGHT,
+    WIN, TILE_MAPS, N, POSITIONS, LIGHT, FPS, WIDTH, HEIGHT,
     HUNTER_IDLE, WUMPUS_IDLE, GOLD, PIT, 
-    W_BREEZE, W_STENCH, W_BS, W_GOLD
+    W_BREEZE, W_STENCH, W_BS, W_GOLD, EXIT
 )
 
 from utils import rotate, load_map
@@ -142,25 +142,25 @@ def run_random_agent():
 
 def get_tile_type(row, col, N):
     # Corners
-    if row == 1 and col == 1:
+    if row == 0 and col == 0:
         return 'map11'      # Bottom-left
-    elif row == 1 and col == N:
+    elif row == 0 and col == N-1:
         return 'map31'      # Bottom-right
-    elif row == N and col == 1:
+    elif row == N-1 and col == 0:
         return 'map13'      # Top-left
-    elif row == N and col == N:
+    elif row == N-1 and col == N-1:
         return 'map33'      # Top-right
     # Top border (excluding corners)
-    elif row == N and col > 1 and col < N:
+    elif row == N-1 and col > 0 and col < N-1:
         return 'map23'
     # Bottom border (excluding corners)
-    elif row == 1 and col > 1 and col < N:
+    elif row == 0 and col > 0 and col < N-1:
         return 'map21'
     # Left border (excluding corners)
-    elif col == 1 and row > 1 and row < N:
+    elif col == 0 and row > 0 and row < N-1:
         return 'map12'
     # Right border (excluding corners)
-    elif col == N and row > 1 and row < N:
+    elif col == N-1 and row > 0 and row < N-1:
         return 'map32'
     # Inside
     else:
@@ -174,16 +174,24 @@ def draw_window(environment, agent, game_elements=None):
     # Draw tile map background
     use_tilemap = len(TILE_MAPS) > 0
     if use_tilemap:
-        for row in range(1, N + 1):      # row = y + 1 (1-indexed)
-            for col in range(1, N + 1):  # col = x + 1 (1-indexed)
+        for row in range(0, N):      # row = y + 1 (1-indexed)
+            for col in range(0, N):  # col = x + 1 (1-indexed)
+                has_gold = agent.has_gold
+                #Draw gate at (0,0)
+                if has_gold:
+                    tile_type = 'exit'
+                    tile_img = load_map(tile_type, N, 800, 800)
+                    x, y = POSITIONS[0][0]
+                    rect = tile_img.get_rect(center=(x, y))
+                    WIN.blit(tile_img, rect)
+                
+                #Draw map at each cell
                 tile_type = get_tile_type(row, col, N)
                 tile_img = load_map(tile_type, N, 800, 800)  # Pass grid size for dynamic scaling
                 # Convert to 0-indexed for POSITIONS array
-                x, y = POSITIONS[row - 1][col - 1]
+                x, y = POSITIONS[row][col]
                 rect = tile_img.get_rect(center=(x, y))
                 WIN.blit(tile_img, rect)
-    else:
-        WIN.blit(MAP, (0, 0))
     # Draw environment elements (pits, wumpus, gold)
     draw_environment_elements(environment)
     
@@ -276,8 +284,9 @@ def draw_percepts(environment, agent):
 
 def run_game_with_gui():
     """Run game with graphical interface and proper asset positioning"""
-    env = Environment(size=N, num_wumpus=1, pit_prob=0.01)
+    env = Environment(size=N, num_wumpus=0, pit_prob=0)
     agent = KBWumpusAgent(env)
+    # agent = RandomWumpusAgent(env)  # Use random agent for GUI demo
     
     # Create hunter sprite
     hunter = Hunter(agent.position[0], agent.position[1], agent.direction)

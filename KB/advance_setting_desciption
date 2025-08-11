@@ -1,0 +1,23 @@
+###Advanced Setting: Moving Wumpus Module:
+In this advanced setting, the Wumpus is no longer stationary. Instead, each Wumpus will move once after every
+5 actions performed by the agent.
+Movement Rules:
+• After the agent has performed 5 actions (of any type: move, turn, grab, shoot, climb), each Wumpus will:
+– Move to one of its valid adjacent cells (North, South, East, or West), chosen uniformly at random.
+– The Wumpus movement is not observable to the agent, only inferred from percept changes.
+– If the intended move would hit a wall, overlap with another Wumpus, or enter a pit, it stays in place.
+Collision Rule:
+• If a Wumpus moves into the agent’s current cell during its movement phase, the agent is immediately
+killed (eaten by the Wumpus).
+Purpose: Because the Wumpus can move, the environment becomes dynamic. The agent’s previous knowledge
+about Wumpus locations can become outdated after each movement phase. Therefore, the agent must:
+• Continuously update its internal map based on new percepts.
+• Act cautiously, as Wumpus positions change over time.
+Requirements:
+• Modify your environment simulator to:
+– Count the agent’s total actions and trigger Wumpus movement after every 5 actions.
+– Implement Wumpus movement according to the rules above.
+– Detect and handle agent-Wumpus collision (agent death).
+• Update your inference engine to: Maintain agent knowledge consistency with percept updates after each
+Wumpus movement phase.
+This module challenges the agent to plan risk-aware decisions in a dynamic and partially observable environment.

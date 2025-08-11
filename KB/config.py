@@ -11,8 +11,8 @@ pygame.init()
 FPS = 30
 
 # Generate random NxN grid size (between 3 and 8 for playability)
-N = 4
-print(f"Generated {N}x{N} Wumpus World grid")
+N = random.randint(4, 8)
+# print(f"Generated {N}x{N} Wumpus World grid")
 
 TILE_MAPS = load_map_tiles()
 print(f"Loaded {len(TILE_MAPS)} map tiles: {list(TILE_MAPS.keys())}")
@@ -23,16 +23,12 @@ print(f"Pit probability set to {PIT_PROBABILITY * 100}%")
 
 POSITIONS = generate_positions(N)
 print(POSITIONS)
-
-
 pit_pos_index = generate_pit_positions(N, PIT_PROBABILITY)
+
 PIT_POSITIONS = [
     (POSITIONS[row][col]) for col, row in pit_pos_index if (col, row) != (0, 0)
 ]
-print(f"Generated pits at positions: {PIT_POSITIONS}")
-
-PROLOG_PATH = os.path.join(os.path.dirname(
-    __file__), os.pardir, 'prolog', 'main.pl')
+# print(f"Generated pits at positions: {PIT_POSITIONS}")
 
 ASSETS = os.path.join(os.path.dirname(
     __file__), 'assets')
@@ -82,13 +78,8 @@ GOLD = scale_for_grid(GOLD, N, "gold", WIDTH, HEIGHT)
 PIT = get_assets(ASSETS, 'pit.png')[0]
 PIT = scale_for_grid(PIT, N, "pit", WIDTH, HEIGHT)
 
-
-MAP = get_assets(ASSETS, 'map')[0]
-MAP = scale(MAP, width=MAP.get_width()*2.7, height=MAP.get_height()*2.7)
-
-
-EXIT = get_assets(ASSETS, 'exit')[0]
-EXIT = scale(EXIT, width=EXIT.get_width()*2.7, height=EXIT.get_height()*2.7)
+EXIT = get_assets(ASSETS, 'exit.png')[0]
+EXIT = scale_for_grid(EXIT, N, "exit", WIDTH, HEIGHT)
 
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption('Wumpus World CLI Game Interface')
