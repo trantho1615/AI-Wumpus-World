@@ -11,7 +11,8 @@ pygame.init()
 FPS = 30
 
 # Generate random NxN grid size (between 3 and 8 for playability)
-N = random.randint(4, 8)
+# N = random.randint(4, 8)
+N = 8
 # print(f"Generated {N}x{N} Wumpus World grid")
 
 TILE_MAPS = load_map_tiles()

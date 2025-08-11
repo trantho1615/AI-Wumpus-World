@@ -284,7 +284,7 @@ def draw_percepts(environment, agent):
 
 def run_game_with_gui():
     """Run game with graphical interface and proper asset positioning"""
-    env = Environment(size=N, num_wumpus=0, pit_prob=0)
+    env = Environment(size=N, num_wumpus=2, pit_prob=0.01)
     agent = KBWumpusAgent(env)
     # agent = RandomWumpusAgent(env)  # Use random agent for GUI demo
     
@@ -298,7 +298,7 @@ def run_game_with_gui():
     running = True
     step_count = 0
     auto_step = False
-    step_delay = 100  # milliseconds between auto steps
+    step_delay = 1000  # milliseconds between auto steps
     last_step_time = 0
     
     print("Game started! Controls:")
@@ -376,10 +376,15 @@ def run_game_with_gui():
                     f"Percepts: {percepts}"
                 )
                 print(log_str)
+                # Check if Wumpus will move after this action
+                will_move_wumpus = (env.action_count + 1) % 5 == 0
                 log_file.write(log_str + "\n")
 
                 # Apply action
                 env.apply_action(agent, action)
+                # Update agent knowledge if Wumpus moved
+                if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
+                    agent.update_wumpus_knowledge()
                 env.print_state(agent)
                 hunter.move_to(agent.position[0], agent.position[1], agent.direction)
                 step_count += 1
@@ -424,9 +429,16 @@ def step_game_once(env, agent, step_count):
     )
     print(log_str)
 
+    # Check if Wumpus will move after this action
+    will_move_wumpus = (env.action_count + 1) % 5 == 0
 
     # Apply action
     env.apply_action(agent, action)
+    
+    # Update agent knowledge if Wumpus moved
+    if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
+        agent.update_wumpus_knowledge()
+    
     env.print_state(agent)
 
     return log_str

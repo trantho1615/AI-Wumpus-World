@@ -82,6 +82,7 @@ class KBWumpusAgent:
         else:
             self.kb.assert_fact(("no_stench", x, y))
 
+        # If we detect gold, mark it
         if ("no_breeze", x, y) in self.kb.facts and ("no_stench", x, y) in self.kb.facts:
             for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
                 nx, ny = x + dx, y + dy
@@ -129,6 +130,19 @@ class KBWumpusAgent:
         self.kb.infer()
         print("KB Facts:", self.kb.facts)
         self.bump = False
+    # Update knowledge base when Wumpus positions may have changed
+    def update_wumpus_knowledge(self):
+        """Update knowledge base when Wumpus positions may have changed"""
+        # Remove old possible_wumpus facts since Wumpus can move
+        old_facts = set(self.kb.facts)
+        self.kb.facts = {fact for fact in self.kb.facts 
+                        if not (fact[0] == "possible_wumpus" or fact[0] == "wumpus")}
+        
+        # Re-infer based on current stench information
+        self.kb.infer()
+        
+        if len(old_facts) != len(self.kb.facts):
+            print(">>> Knowledge updated after Wumpus movement")
 
     def _get_delta(self, direction):
         return {
@@ -162,12 +176,12 @@ class KBWumpusAgent:
         if percepts.get("glitter", False) and not self.has_gold:
             print(f"Gold detected at {self.position}, grabbing it and heading home.")
             self.has_gold = True
-
+            # Plan to grab gold and return home
             home_path = self._reverse_path_home()  
             actions_home = self._path_to_actions(home_path) if home_path else []
 
             self.plan = ["grab"] + actions_home + ["climb"]
-
+        # If we have gold and a plan, continue with the plan
         if self.has_gold and self.plan:
             return self.plan.pop(0)
 
@@ -226,7 +240,7 @@ class KBWumpusAgent:
                     self.plan = path
                     print(f"[Fallback] Planning to explore: {cell}, path: {path}")
                     return self.get_action_towards(self.plan.pop(0))
-
+        # Explore unknown cells
         unknown_cells = [
             (nx, ny) for nx in range(self.env.size) for ny in range(self.env.size)
             if (nx, ny) not in self.visited
@@ -268,7 +282,7 @@ class KBWumpusAgent:
                 return 'turn_right'
 
         return 'move'
-
+    # Reverse path to home
     def _reverse_path_home(self):
         path = astar(self.position, (0, 0), self.kb, self.env.size, allow_unknown=False)
         return path if path else []

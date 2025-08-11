@@ -18,6 +18,9 @@ class Environment:
         self.arrow_used = False
         self.scream = False
         self.gold_found = False
+        # Advanced: Moving Wumpus Module
+        self.action_count = 0
+        self.wumpus_positions = []  # Track wumpus positions for movement
         self.place_pit_and_wumpus(num_wumpus, pit_prob)
         self.place_gold()
         self.wall = False
@@ -30,6 +33,7 @@ class Environment:
             if candidates:
                 x, y = candidates.pop()
                 self.grid[x][y].wumpus = True
+                self.wumpus_positions.append((x, y))  # Track wumpus positions
 
         for x in range(self.size):
             for y in range(self.size):
@@ -68,6 +72,9 @@ class Environment:
     def apply_action(self, agent, action):
         x, y = agent.position
         self.scream = False
+        
+        # Count actions for Moving Wumpus Module
+        self.action_count += 1
 
         if action == "grab":
             if self.grid[x][y].gold:
@@ -118,11 +125,18 @@ class Environment:
             while 0 <= tx < self.size and 0 <= ty < self.size:
                 if self.grid[tx][ty].wumpus:
                     self.grid[tx][ty].wumpus = False
+                    # Remove from wumpus_positions when killed
+                    if (tx, ty) in self.wumpus_positions:
+                        self.wumpus_positions.remove((tx, ty))
                     self.scream = True
                     print(f">>> Wumpus at ({tx},{ty}) has been eliminated!")
                     break
                 tx += dx
                 ty += dy
+        
+        # Move Wumpus after every 5 actions
+        if self.action_count % 5 == 0:
+            self.move_wumpus(agent)
             
 
     def _get_delta(self, direction):
@@ -176,3 +190,51 @@ class Environment:
         for x, y in positions:
             if (x, y) != (0, 0):  
                 self.grid[x][y].wall = True
+
+    def move_wumpus(self, agent):
+        """Move each Wumpus to a random adjacent cell after every 5 actions"""
+        print(f">>> Moving Wumpus (after {self.action_count} actions)...")
+        
+        new_wumpus_positions = []
+        
+        for i, (wx, wy) in enumerate(self.wumpus_positions):
+            # Get valid adjacent cells for Wumpus movement
+            adjacent_cells = []
+            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:  # N, S, E, W
+                new_x, new_y = wx + dx, wy + dy
+                
+                # Check bounds
+                if 0 <= new_x < self.size and 0 <= new_y < self.size:
+                    # Check if cell is valid (no pit, no other wumpus)
+                    if (not self.grid[new_x][new_y].pit and 
+                        (new_x, new_y) not in self.wumpus_positions and
+                        (new_x, new_y) not in new_wumpus_positions):
+                        adjacent_cells.append((new_x, new_y))
+            
+            # Include current position as an option (stay in place)
+            adjacent_cells.append((wx, wy))
+            
+            # Choose random cell
+            if adjacent_cells:
+                new_pos = random.choice(adjacent_cells)
+                new_x, new_y = new_pos
+                
+                # Move wumpus in grid
+                self.grid[wx][wy].wumpus = False
+                self.grid[new_x][new_y].wumpus = True
+                new_wumpus_positions.append((new_x, new_y))
+                
+                if (new_x, new_y) != (wx, wy):
+                    print(f">>> Wumpus moved from ({wx},{wy}) to ({new_x},{new_y})")
+                
+                # Check collision with agent
+                if (new_x, new_y) == agent.position:
+                    print(f">>> Wumpus moved into agent's position! Agent killed!")
+                    agent.done = True
+                    self.score -= 1000
+            else:
+                # No valid moves, stay in place
+                new_wumpus_positions.append((wx, wy))
+        
+        # Update wumpus positions
+        self.wumpus_positions = new_wumpus_positions
