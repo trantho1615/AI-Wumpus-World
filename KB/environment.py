@@ -18,6 +18,7 @@ class Environment:
         self.arrow_used = False
         self.scream = False
         self.gold_found = False
+        self.death_cause = None  # Track specific death cause
         # Advanced: Moving Wumpus Module
         self.advance_setting = advance_setting
         self.action_count = 0
@@ -159,8 +160,10 @@ class Environment:
         cell = self.grid[x][y]
         if cell.pit:
             print(f"Fell into pit at ({x},{y})!")
+            self.death_cause = "pit"
         if cell.wumpus:
             print(f"Killed by Wumpus at ({x},{y})!")
+            self.death_cause = "wumpus"
         if cell.pit or cell.wumpus:
             self.score -= 1000
             agent.done = True

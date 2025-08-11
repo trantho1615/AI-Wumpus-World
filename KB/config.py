@@ -1,6 +1,8 @@
 import os
 import pygame
 import random
+import argparse
+import sys
 from utils import scale, get_assets, rotate, generate_positions, generate_pit_positions, load_map_tiles, scale_for_grid
 
 WIDTH = 800
@@ -10,30 +12,80 @@ pygame.init()
 
 FPS = 30
 
-# Generate random NxN grid size (between 3 and 8 for playability)
-# N = random.randint(4, 8)
-N = 8
+# Parse command line arguments
+def parse_arguments():
+    """Parse command line arguments for game configuration"""
+    parser = argparse.ArgumentParser(
+        description='Wumpus World AI Game',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python main.py                    # Default: 8x8 grid, 2 wumpuses, 20% pits, KB agent, GUI
+  python main.py 4                  # 4x4 grid with defaults
+  python main.py 4 1 0.01           # 4x4 grid, 1 wumpus, 1% pits
+  python main.py 6 3 0.15 -r        # 6x6 grid, 3 wumpuses, 15% pits, random agent
+  python main.py 4 1 0.01 -a --console  # 4x4 grid, KB agent, console mode
+        """
+    )
+    
+    # Positional arguments
+    parser.add_argument('grid_size', nargs='?', type=int, default=8,
+                       help='Grid size N for NxN world (default: 8)')
+    parser.add_argument('num_wumpus', nargs='?', type=int, default=2,
+                       help='Number of wumpuses in the world (default: 2)')
+    parser.add_argument('pit_prob', nargs='?', type=float, default=0.2,
+                       help='Probability of pits in each cell (default: 0.2)')
+    
+    # Optional arguments
+    parser.add_argument('--console', action='store_true',
+                       help='Run in console mode instead of GUI')
+    parser.add_argument('-r', '--random', action='store_true',
+                       help='Use random agent instead of KB agent')
+    parser.add_argument('-a', '--kb-agent', action='store_true',
+                       help='Use KB agent (default behavior)')
+    
+    args = parser.parse_args()
+    
+    # Validation
+    if not (3 <= args.grid_size <= 20):
+        print(f"❌ Error: Grid size must be between 3 and 20, got {args.grid_size}")
+        sys.exit(1)
+    
+    max_wumpuses = args.grid_size * args.grid_size - 2  # Leave space for agent and gold
+    if not (0 <= args.num_wumpus <= max_wumpuses):
+        print(f"❌ Error: Number of wumpuses must be between 0 and {max_wumpuses} for {args.grid_size}x{args.grid_size} grid, got {args.num_wumpus}")
+        sys.exit(1)
+    
+    if not (0.0 <= args.pit_prob <= 1.0):
+        print(f"❌ Error: Pit probability must be between 0.0 and 1.0, got {args.pit_prob}")
+        sys.exit(1)
+    
+    return args
+
+# Parse arguments and set global game configuration
+args = parse_arguments()
+
+# Global game configuration variables
+GAME_N = args.grid_size
+GAME_NUM_WUMPUS = args.num_wumpus
+GAME_PIT_PROB = args.pit_prob
+GAME_CONSOLE_MODE = args.console
+GAME_AGENT_TYPE = 'random' if args.random else 'kb'
+
+# Use GAME_N for asset scaling and positioning
+N = GAME_N
 # print(f"Generated {N}x{N} Wumpus World grid")
 
 TILE_MAPS = load_map_tiles()
 print(f"Loaded {len(TILE_MAPS)} map tiles: {list(TILE_MAPS.keys())}")
 
-# Pit probability - percentage chance each cell has a pit (excluding starting position)
-PIT_PROBABILITY = 0.2  # 20% chance each cell contains a pit
-print(f"Pit probability set to {PIT_PROBABILITY * 100}%")
-
 # Advanced Setting: Moving Wumpus Module (can be toggled during gameplay)
 ADVANCE_SETTING = False  # Default off, can be toggled with 'M' key
 print(f"Moving Wumpus Module (Advance Setting): {'ON' if ADVANCE_SETTING else 'OFF'}")
 
+# Generate pixel positions for the grid base on grid size N
 POSITIONS = generate_positions(N)
 print(POSITIONS)
-pit_pos_index = generate_pit_positions(N, PIT_PROBABILITY)
-
-PIT_POSITIONS = [
-    (POSITIONS[row][col]) for col, row in pit_pos_index if (col, row) != (0, 0)
-]
-# print(f"Generated pits at positions: {PIT_POSITIONS}")
 
 ASSETS = os.path.join(os.path.dirname(
     __file__), 'assets')
