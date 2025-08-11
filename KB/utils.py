@@ -189,6 +189,7 @@ def scale_for_grid(image, grid_size, asset_type="default", width=800, height=800
         "warning": 0.3,     # Warning icons small and in corner
         "tile": 1.0,        # Tiles fill entire cell
         "default": 0.5,      # Default moderate  size
+        "light": 2
     }
     
     multiplier = scaling_multipliers.get(asset_type, 0.5)

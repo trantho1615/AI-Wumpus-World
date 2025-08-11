@@ -12,7 +12,8 @@ from config import (
     WIN, TILE_MAPS, N, POSITIONS, LIGHT, FPS, WIDTH, HEIGHT,
     HUNTER_IDLE, WUMPUS_IDLE, GOLD, PIT, 
     W_BREEZE, W_STENCH, W_BS, W_GOLD, EXIT, ADVANCE_SETTING,
-    GAME_N, GAME_NUM_WUMPUS, GAME_PIT_PROB, GAME_CONSOLE_MODE, GAME_AGENT_TYPE
+    GAME_N, GAME_NUM_WUMPUS, GAME_PIT_PROB, GAME_CONSOLE_MODE, GAME_AGENT_TYPE,
+    GAME_LIGHT_ENABLED, WUMPUS_SCREAM_SOUND
 )
 
 from utils import rotate, load_map
@@ -125,6 +126,42 @@ class GameElement:
         self.grid_y = grid_y
         self.pixel_x, self.pixel_y = get_pixel_position(grid_x, grid_y)
 
+class Light:
+    """Class to draw the light effect on the hunter position"""
+    
+    def __init__(self):
+        self.x, self.y = 0, 0
+        self.image = LIGHT
+        self.filter = pygame.Surface((WIDTH, HEIGHT))
+        self.filter.fill(pygame.Color('white'))
+        self.visited = []
+    
+    def update(self, hunter_obj):
+        """Update light position based on hunter position"""
+        new_coords = (hunter_obj.pixel_x, hunter_obj.pixel_y)
+        if new_coords not in self.visited and new_coords != (self.x, self.y):
+            self.x, self.y = new_coords
+            light_pos = (self.x, self.y)
+            self.rect = self.image.get_rect(center=light_pos)
+            self.visited.append(new_coords)
+        else:
+            # Hide light if already visited this position
+            self.rect = pygame.Rect(-999, -999, 0, 0)
+    
+    def draw(self):
+        """Draw the light effect using subtractive blending"""
+        # Clear the filter surface
+        self.filter.fill(pygame.Color('white'))
+        
+        # Draw light circles at all visited positions
+        for pos in self.visited:
+            light_rect = self.image.get_rect(center=pos)
+            self.filter.blit(self.image, light_rect)
+        
+        # Apply the subtractive blend to create fog of war effect
+        self.filter.blit(self.image, self.rect)
+        WIN.blit(self.filter, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+
 class Hunter(GameElement, pygame.sprite.Sprite):
     """Hunter/Agent sprite with animations"""
     def __init__(self, grid_x, grid_y, direction="E"):
@@ -214,6 +251,10 @@ def run_random_agent():
         agent.perceive(percepts)
         percepts["bump"] = getattr(agent, "bump", False)
         percepts["scream"] = env.scream
+        
+        # Play scream sound if Wumpus was killed
+        if env.scream and WUMPUS_SCREAM_SOUND:
+            WUMPUS_SCREAM_SOUND.play()
 
         action = agent.choose_action()
         print(f"[Step {steps}] Action: {action}")
@@ -255,7 +296,7 @@ def get_tile_type(row, col, N):
         return 'map22'
 
 
-def draw_window(environment, agent, game_elements=None):
+def draw_window(environment, agent, game_elements=None, light=None):
     """Update the window with all game elements"""
     WIN.fill((0, 0, 0))  # Clear screen with black
 
@@ -292,6 +333,10 @@ def draw_window(environment, agent, game_elements=None):
         for element in game_elements:
             if element:
                 element.draw()
+    
+    # Draw light effect if provided and enabled
+    if light and GAME_LIGHT_ENABLED:
+        light.draw()
     
     # Draw visual announcements on top of everything
     draw_visual_announcement()
@@ -398,21 +443,21 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
         title_color = GOLD
         subtitle_color = GREEN
         bg_color = (0, 50, 0)  # Dark green background
-        title_text = "🏆 VICTORY! 🏆"
+        title_text = "VICTORY!"
         subtitle_text = "Successfully Escaped with Gold!"
         effect_particles = True
     elif game_result == "death":
         title_color = RED
         subtitle_color = WHITE
         bg_color = (50, 0, 0)  # Dark red background
-        title_text = "💀 GAME OVER 💀"
+        title_text = "GAME OVER"
         
         # Determine specific death cause
         if hasattr(env, 'death_cause') and env.death_cause:
             if env.death_cause == "wumpus":
-                subtitle_text = "Killed by the Wumpus! 🐉"
+                subtitle_text = "Killed by the Wumpus!"
             elif env.death_cause == "pit":
-                subtitle_text = "Fell into a Pit! 🕳️"
+                subtitle_text = "Fell into a Pit!"
             else:
                 subtitle_text = "Did Not Survive"
         else:
@@ -423,7 +468,7 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
         title_color = (255, 165, 0)  # Orange
         subtitle_color = WHITE
         bg_color = (50, 25, 0)  # Dark orange background
-        title_text = "⏰ TIME'S UP ⏰"
+        title_text = "TIME'S UP"
         subtitle_text = "Maximum Steps Reached"
         effect_particles = False
     else:
@@ -546,7 +591,6 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
         instruction_y = HEIGHT - 120
         instructions = [
             "Press R to restart game",
-            "Press SPACE or ENTER to continue",
             "Press Q to quit"
         ]
         
@@ -573,21 +617,21 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
     print(f"Cells Explored: {cells_explored}/{total_cells} ({exploration_percentage:.1f}%)")
     
     if hasattr(agent, 'has_gold') and agent.has_gold:
-        print(f"Gold Status: COLLECTED ✓")
+        print(f"Gold Status: COLLECTED")
     else:
-        print(f"Gold Status: NOT COLLECTED ✗")
+        print(f"Gold Status: NOT COLLECTED")
     
     if game_result == "victory":
         print("Outcome: SUCCESSFUL ESCAPE WITH GOLD! 🏆")
         efficiency = (1000 + final_score) / (total_actions * 10)
         print(f"Efficiency Score: {efficiency:.2f}")
     elif game_result == "death":
-        print("Outcome: AGENT ELIMINATED 💀")
+        print("Outcome: AGENT ELIMINATED")
         if hasattr(env, 'death_cause') and env.death_cause:
             if env.death_cause == "wumpus":
-                print("Cause: Killed by the Wumpus 🐉")
+                print("Cause: Killed by the Wumpus")
             elif env.death_cause == "pit":
-                print("Cause: Fell into a pit 🕳️")
+                print("Cause: Fell into a pit")
             else:
                 print(f"Cause: {env.death_cause}")
         elif hasattr(env, 'last_death_cause'):
@@ -645,12 +689,20 @@ def run_game_with_gui():
 
 def run_single_game(env, agent, advance_enabled):
     """Run a single game instance"""
+    global GAME_LIGHT_ENABLED
     # agent = RandomWumpusAgent(env)  # Use random agent for GUI demo
     
     # Create hunter sprite
     hunter = Hunter(agent.position[0], agent.position[1], agent.direction)
     all_sprites = pygame.sprite.Group()
     all_sprites.add(hunter)
+    
+    # Create light object for fog of war effect (if enabled)
+    light = None
+    if GAME_LIGHT_ENABLED:
+        light = Light()
+        # Initialize light with hunter's starting position
+        light.update(hunter)
 
     # Game state
     clock = pygame.time.Clock()
@@ -667,6 +719,7 @@ def run_single_game(env, agent, advance_enabled):
     print("  SPACE - Execute manual step")
     print("  A     - Toggle auto-play mode")
     print("  M     - Toggle Moving Wumpus (Advance Setting)")
+    print("  L     - Toggle fog of war lighting effect")
     print("  R     - Reset/Restart game")
     print("  H     - Show in-game help")
     print("  Q     - Quit game")
@@ -674,6 +727,7 @@ def run_single_game(env, agent, advance_enabled):
     print(f"  Moving Wumpus Module: {'🟢 ACTIVATED' if advance_enabled else '🔴 DEACTIVATED'}")
     if advance_enabled:
         print("  ⚠️  Wumpuses will move every 5 actions!")
+    print(f"  Fog of War Lighting: {'🟢 ENABLED' if GAME_LIGHT_ENABLED else '🔴 DISABLED'}")
     print(f"  Auto-play: 🔴 DEACTIVATED (Press A to toggle)")
     print("="*60)
     
@@ -695,6 +749,10 @@ def run_single_game(env, agent, advance_enabled):
                         agent.perceive(percepts)
                         percepts["bump"] = getattr(agent, "bump", False)
                         percepts["scream"] = env.scream
+                        
+                        # Play scream sound if Wumpus was killed
+                        if env.scream and WUMPUS_SCREAM_SOUND:
+                            WUMPUS_SCREAM_SOUND.play()
 
                         # Agent chooses action
                         action = agent.choose_action()
@@ -722,6 +780,8 @@ def run_single_game(env, agent, advance_enabled):
                             
                         env.print_state(agent)
                         hunter.move_to(agent.position[0], agent.position[1], agent.direction)
+                        if light:
+                            light.update(hunter)
                         step_count += 1
                     elif event.key == pygame.K_a:
                         # Toggle auto step
@@ -784,6 +844,11 @@ def run_single_game(env, agent, advance_enabled):
                             agent = KBWumpusAgent(env)
                             
                         hunter.move_to(agent.position[0], agent.position[1], agent.direction)
+                        # Reset light for new game (if enabled)
+                        light = None
+                        if GAME_LIGHT_ENABLED:
+                            light = Light()
+                            light.update(hunter)
                         step_count = 0
                         auto_step = False
                         
@@ -805,6 +870,33 @@ def run_single_game(env, agent, advance_enabled):
                         continue_game = display_visual_instructions()
                         if not continue_game:
                             running = False
+                    elif event.key == pygame.K_l:
+                        # Toggle light effect
+                        GAME_LIGHT_ENABLED = not GAME_LIGHT_ENABLED
+                        
+                        if GAME_LIGHT_ENABLED:
+                            # Re-enable light
+                            if light is None:
+                                light = Light()
+                                light.update(hunter)
+                            display_visual_announcement("💡 FOG OF WAR LIGHTING - ENABLED!", 1000, "success")
+                        else:
+                            # Disable light
+                            display_visual_announcement("🌕 FULL VISIBILITY - LIGHTING DISABLED!", 1000, "info")
+                        
+                        # Console announcement
+                        print("\n" + "="*50)
+                        print(f"💡 FOG OF WAR LIGHTING: {'🟢 ENABLED' if GAME_LIGHT_ENABLED else '🔴 DISABLED'}")
+                        print("="*50)
+                        if GAME_LIGHT_ENABLED:
+                            print("🌫️  Fog of war effect activated!")
+                            print("🔦 Light reveals areas as you explore")
+                            print("🕳️  Unexplored areas remain in darkness")
+                        else:
+                            print("🌕 Full visibility restored!")
+                            print("👁️  All areas are clearly visible")
+                            print("🗺️  Perfect for strategic planning")
+                        print("="*50)
                     elif event.key == pygame.K_q:
                         running = False
             
@@ -814,6 +906,10 @@ def run_single_game(env, agent, advance_enabled):
                 agent.perceive(percepts)
                 percepts["bump"] = getattr(agent, "bump", False)
                 percepts["scream"] = env.scream
+                
+                # Play scream sound if Wumpus was killed
+                if env.scream and WUMPUS_SCREAM_SOUND:
+                    WUMPUS_SCREAM_SOUND.play()
 
                 # Agent chooses action
                 action = agent.choose_action()
@@ -839,14 +935,20 @@ def run_single_game(env, agent, advance_enabled):
                     agent.update_wumpus_knowledge()
                 env.print_state(agent)
                 hunter.move_to(agent.position[0], agent.position[1], agent.direction)
+                if light:
+                    light.update(hunter)
                 step_count += 1
                 last_step_time = current_time
             
             # Update sprites
             all_sprites.update()
             
+            # Update light with current hunter position
+            if light:
+                light.update(hunter)
+            
             # Draw everything with proper positioning
-            draw_window(env, agent, all_sprites)
+            draw_window(env, agent, all_sprites, light)
             clock.tick(FPS)
         
         # Game over
@@ -882,6 +984,10 @@ def step_game_once(env, agent, step_count, advance_enabled=False):
     agent.perceive(percepts)
     percepts["bump"] = getattr(agent, "bump", False)
     percepts["scream"] = env.scream
+    
+    # Play scream sound if Wumpus was killed
+    if env.scream and WUMPUS_SCREAM_SOUND:
+        WUMPUS_SCREAM_SOUND.play()
 
     # Agent chooses action
     action = agent.choose_action()
@@ -924,6 +1030,10 @@ def run_game():
 
             percepts["bump"] = getattr(agent, "bump", False)
             percepts["scream"] = env.scream
+            
+            # Play scream sound if Wumpus was killed
+            if env.scream and WUMPUS_SCREAM_SOUND:
+                WUMPUS_SCREAM_SOUND.play()
 
             action = agent.choose_action()
 
@@ -944,74 +1054,6 @@ def run_game():
             env.print_state(agent)
             steps += 1
 
-def display_game_instructions():
-    """Display comprehensive game instructions and controls"""
-    print("\n" + "="*80)
-    print("🎮 WUMPUS WORLD - GAME INSTRUCTIONS & CONTROLS")
-    print("="*80)
-    
-    print("\n🎯 OBJECTIVE:")
-    print("  • Navigate the dangerous Wumpus World to find gold and escape alive")
-    print("  • Avoid deadly Wumpuses and bottomless pits")
-    print("  • Use your knowledge base to make intelligent decisions")
-    
-    print("\n🎮 GAME CONTROLS:")
-    print("  SPACE        - Execute one manual step (when auto-play is OFF)")
-    print("  A            - Toggle Auto-play mode (ON/OFF)")
-    print("  M            - Toggle Moving Wumpus Module (Advance Setting)")
-    print("  R            - Reset/Restart current game")
-    print("  Q            - Quit game")
-    
-    print("\n🎮 GAME OVER SCREEN CONTROLS:")
-    print("  R            - Restart with new game environment")
-    print("  SPACE/ENTER  - Continue viewing results")
-    print("  Q            - Quit application")
-    
-    print("\n⚙️ GAME FEATURES:")
-    print("  📊 Statistics Display:")
-    print("     • Performance rating and final score")
-    print("     • Total actions taken and exploration percentage")
-    print("     • Game outcome with specific death causes")
-    
-    print("\n  🤖 Agent Intelligence:")
-    print("     • Knowledge-based reasoning using logical inference")
-    print("     • Safe path planning and risk assessment")
-    print("     • Wumpus hunting with arrow shots")
-    
-    print("\n  🌟 Advanced Features:")
-    print("     • Moving Wumpus Module: Wumpuses move every 5 actions")
-    print("     • Enhanced death messages (Wumpus/Pit specific)")
-    print("     • Visual game over screen with animations")
-    print("     • Restart functionality for multiple games")
-    
-    print("\n🎯 GAME ELEMENTS:")
-    print("  A  - Agent (You)")
-    print("  W  - Wumpus (Deadly creature)")
-    print("  G  - Gold (Your objective)")
-    print("  P  - Pit (Bottomless hole)")
-    print("  .  - Safe empty cell")
-    print("  #  - Wall boundary")
-    
-    print("\n🧠 KNOWLEDGE BASE:")
-    print("  • Agent uses logical reasoning to deduce safe moves")
-    print("  • Percepts: Stench (near Wumpus), Breeze (near Pit)")
-    print("  • Knowledge facts: safe/unsafe cells, Wumpus locations")
-    
-    print("\n🎮 GAMEPLAY MODES:")
-    print("  Manual Mode:  Use SPACE to execute each step carefully")
-    print("  Auto Mode:    Agent automatically executes optimal moves")
-    print("  Standard:     Static Wumpuses for classic gameplay")
-    print("  Advanced:     Moving Wumpuses for increased challenge")
-    
-    print("\n💡 TIPS:")
-    print("  • Watch percepts to identify nearby dangers")
-    print("  • Use auto-play to see agent's reasoning in action")
-    print("  • Try both standard and advanced modes")
-    print("  • Restart anytime to try different strategies")
-    
-    print("="*80)
-    print("🚀 Press any key to start the game...")
-    print("="*80)
 
 def display_in_game_help(advance_enabled, auto_step):
     """Display concise in-game help during gameplay"""
@@ -1036,33 +1078,31 @@ def display_in_game_help(advance_enabled, auto_step):
     print("="*50)
 
 def display_visual_instructions():
-    """Display animated visual instructions overlay in game window"""
+    """Display centered controls overlay in game window"""
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
     BLUE = (100, 149, 237)
     GOLD = (255, 215, 0)
     GREEN = (0, 255, 0)
-    GRAY = (128, 128, 128)
     PURPLE = (147, 112, 219)
     RED = (255, 0, 0)
     
     clock = pygame.time.Clock()
     start_time = pygame.time.get_ticks()
     
-    # Fonts
-    title_font = pygame.font.Font(None, 48)
-    header_font = pygame.font.Font(None, 36)
-    detail_font = pygame.font.Font(None, 24)
-    small_font = pygame.font.Font(None, 20)
+    # Larger fonts for better visibility
+    title_font = pygame.font.Font(None, 56)
+    control_font = pygame.font.Font(None, 36)
+    desc_font = pygame.font.Font(None, 32)
     
     # Particle system for background effect
     particles = []
-    for _ in range(50):
+    for _ in range(30):
         particles.append({
             'x': random.randint(0, WIDTH),
             'y': random.randint(0, HEIGHT),
-            'dx': random.uniform(-1, 1),
-            'dy': random.uniform(-1, 1),
+            'dx': random.uniform(-0.5, 0.5),
+            'dy': random.uniform(-0.5, 0.5),
             'size': random.randint(1, 3),
             'color': random.choice([BLUE, PURPLE, GOLD])
         })
@@ -1080,7 +1120,7 @@ def display_visual_instructions():
                     showing = False
                     return True
         
-        # Draw background with gradient effect
+        # Draw background
         WIN.fill(BLACK)
         
         # Draw animated particles
@@ -1095,10 +1135,7 @@ def display_visual_instructions():
             if particle['y'] > HEIGHT: particle['y'] = 0
             
             # Pulsing effect
-            alpha = 100 + 50 * math.sin(animation_time * 3 + particle['x'] * 0.01)
-            color = (*particle['color'], int(alpha))
-            
-            # Create surface for alpha blending
+            alpha = 80 + 40 * math.sin(animation_time * 2 + particle['x'] * 0.01)
             particle_surface = pygame.Surface((particle['size']*2, particle['size']*2))
             particle_surface.set_alpha(int(alpha))
             particle_surface.fill(particle['color'])
@@ -1106,36 +1143,34 @@ def display_visual_instructions():
         
         # Semi-transparent overlay
         overlay = pygame.Surface((WIDTH, HEIGHT))
-        overlay.set_alpha(180)
+        overlay.set_alpha(200)
         overlay.fill((0, 20, 40))
         WIN.blit(overlay, (0, 0))
         
-        # Main title with glow effect
-        title_y = 40
-        glow_offset = 3 * math.sin(animation_time * 2)
+        # Main title centered at top
+        title_y = 120
+        glow_offset = 2 * math.sin(animation_time * 2)
         
-        # Title glow
+        # Title glow effect
         for offset in range(3, 0, -1):
-            glow_surface = title_font.render("🎮 GAME INSTRUCTIONS 🎮", True, BLUE)
+            glow_surface = title_font.render("🎮 GAME CONTROLS 🎮", True, BLUE)
             glow_surface.set_alpha(30 * offset)
             glow_rect = glow_surface.get_rect(center=(WIDTH//2 + glow_offset, title_y + offset))
             WIN.blit(glow_surface, glow_rect)
         
         # Main title
-        title_surface = title_font.render("🎮 GAME INSTRUCTIONS 🎮", True, GOLD)
+        title_surface = title_font.render("🎮 GAME CONTROLS 🎮", True, GOLD)
         title_rect = title_surface.get_rect(center=(WIDTH//2 + glow_offset, title_y))
         WIN.blit(title_surface, title_rect)
         
-        # Controls section
-        controls_y = 100
-        controls_title = header_font.render("🎯 CONTROLS", True, GREEN)
-        controls_rect = controls_title.get_rect(center=(WIDTH//2, controls_y))
-        WIN.blit(controls_title, controls_rect)
+        # Controls section - centered on screen
+        controls_start_y = HEIGHT // 2 - 120  # Center the controls vertically
         
-        # Control items with icons and descriptions
+        # Control items with better formatting
         controls = [
             ("SPACE", "Execute manual step", WHITE),
             ("A", "Toggle auto-play mode", BLUE),
+            ("L", "Toggle fog of war lighting", GREEN),
             ("M", "Toggle Moving Wumpus", PURPLE),
             ("R", "Reset/Restart game", GREEN),
             ("H", "Show/Hide this help", GOLD),
@@ -1143,79 +1178,28 @@ def display_visual_instructions():
         ]
         
         for i, (key, desc, color) in enumerate(controls):
-            y_pos = controls_y + 40 + i * 30
+            y_pos = controls_start_y + i * 45  # Increased spacing for better readability
             
-            # Sliding animation
-            slide_offset = max(0, 300 - (animation_time - i * 0.1) * 500)
-            x_pos = WIDTH//2 - 200 + slide_offset
+            # Fade-in animation
+            control_alpha = max(0, 255 * (animation_time - i * 0.1))
             
-            if slide_offset <= 0:  # Only show when animation is complete
-                # Key box
-                key_surface = detail_font.render(f"[{key}]", True, color)
-                WIN.blit(key_surface, (x_pos, y_pos))
+            if control_alpha > 0:
+                # Key display - centered
+                key_text = f"[{key}]"
+                key_surface = control_font.render(key_text, True, color)
+                key_surface.set_alpha(int(min(255, control_alpha)))
+                key_rect = key_surface.get_rect(center=(WIDTH//2 - 120, y_pos))
+                WIN.blit(key_surface, key_rect)
                 
-                # Description
-                desc_surface = detail_font.render(f"- {desc}", True, WHITE)
-                WIN.blit(desc_surface, (x_pos + 100, y_pos))
+                # Description - aligned with key
+                desc_surface = desc_font.render(f"- {desc}", True, WHITE)
+                desc_surface.set_alpha(int(min(255, control_alpha)))
+                WIN.blit(desc_surface, (WIDTH//2 - 50, y_pos - 2))
         
-        # Game elements section
-        elements_y = 360
-        elements_alpha = max(0, 255 * (animation_time - 1.5))
-        if elements_alpha > 0:
-            elements_title = header_font.render("🎯 GAME ELEMENTS", True, GREEN)
-            elements_title.set_alpha(int(min(255, elements_alpha)))
-            elements_rect = elements_title.get_rect(center=(WIDTH//2, elements_y))
-            WIN.blit(elements_title, elements_rect)
-            
-            elements = [
-                ("A", "Agent (You)", WHITE),
-                ("W", "Wumpus (Deadly)", RED),
-                ("G", "Gold (Objective)", GOLD),
-                ("P", "Pit (Dangerous)", GRAY),
-                (".", "Safe cell", GREEN),
-                ("#", "Wall", WHITE)
-            ]
-            
-            for i, (symbol, desc, color) in enumerate(elements):
-                y_pos = elements_y + 40 + i * 25
-                x_pos = WIDTH//2 - 150
-                
-                symbol_surface = detail_font.render(f"[{symbol}]", True, color)
-                symbol_surface.set_alpha(int(min(255, elements_alpha)))
-                WIN.blit(symbol_surface, (x_pos, y_pos))
-                
-                desc_surface = small_font.render(f"- {desc}", True, WHITE)
-                desc_surface.set_alpha(int(min(255, elements_alpha)))
-                WIN.blit(desc_surface, (x_pos + 60, y_pos))
-        
-        # Features section
-        features_y = 550
-        features_alpha = max(0, 255 * (animation_time - 2.5))
-        if features_alpha > 0:
-            features_title = header_font.render("✨ FEATURES", True, PURPLE)
-            features_title.set_alpha(int(min(255, features_alpha)))
-            features_rect = features_title.get_rect(center=(WIDTH//2, features_y))
-            WIN.blit(features_title, features_rect)
-            
-            features = [
-                "🧠 AI Knowledge Base System",
-                "🐉 Moving Wumpus Module",
-                "💀 Specific Death Messages",
-                "🔄 Restart Functionality",
-                "📊 Detailed Statistics"
-            ]
-            
-            for i, feature in enumerate(features):
-                y_pos = features_y + 40 + i * 25
-                feature_surface = small_font.render(feature, True, WHITE)
-                feature_surface.set_alpha(int(min(255, features_alpha)))
-                feature_rect = feature_surface.get_rect(center=(WIDTH//2, y_pos))
-                WIN.blit(feature_surface, feature_rect)
-        
-        # Exit instruction at bottom
-        exit_y = HEIGHT - 50
+        # Exit instruction at bottom with pulsing effect
+        exit_y = HEIGHT - 80
         exit_alpha = 150 + 100 * math.sin(animation_time * 3)
-        exit_surface = detail_font.render("Press H, ESC, SPACE, or ENTER to close", True, GOLD)
+        exit_surface = desc_font.render("Press H, ESC, SPACE, or ENTER to close", True, GOLD)
         exit_surface.set_alpha(int(exit_alpha))
         exit_rect = exit_surface.get_rect(center=(WIDTH//2, exit_y))
         WIN.blit(exit_surface, exit_rect)
@@ -1239,8 +1223,8 @@ def display_welcome_screen():
     
     # Fonts
     title_font = pygame.font.Font(None, 64)
-    subtitle_font = pygame.font.Font(None, 36)
-    detail_font = pygame.font.Font(None, 28)
+    subtitle_font = pygame.font.Font(None, 42)  # Increased from 36
+    detail_font = pygame.font.Font(None, 32)    # Increased from 28
     
     # Particle system
     particles = []
@@ -1297,36 +1281,28 @@ def display_welcome_screen():
         
         # Title glow effect
         for offset in range(4, 0, -1):
-            glow_surface = title_font.render("🎮 WUMPUS WORLD 🎮", True, BLUE)
+            glow_surface = title_font.render("WUMPUS WORLD", True, BLUE)
             glow_surface.set_alpha(20 * offset)
             glow_rect = glow_surface.get_rect(center=(WIDTH//2, title_y + title_offset + offset))
             WIN.blit(glow_surface, glow_rect)
         
         # Main title
-        title_surface = title_font.render("🎮 WUMPUS WORLD 🎮", True, GOLD)
+        title_surface = title_font.render("WUMPUS WORLD", True, GOLD)
         title_rect = title_surface.get_rect(center=(WIDTH//2, title_y + title_offset))
         WIN.blit(title_surface, title_rect)
         
-        # Subtitle
-        subtitle_alpha = max(0, 255 * (animation_time - 1))
-        if subtitle_alpha > 0:
-            subtitle_surface = subtitle_font.render("AI Knowledge-Based Agent Adventure", True, WHITE)
-            subtitle_surface.set_alpha(int(min(255, subtitle_alpha)))
-            subtitle_rect = subtitle_surface.get_rect(center=(WIDTH//2, title_y + 80))
-            WIN.blit(subtitle_surface, subtitle_rect)
-        
         # Quick start instructions
-        instructions_alpha = max(0, 255 * (animation_time - 2))
+        instructions_alpha = max(0, 255 * (animation_time - 0.5))
         if instructions_alpha > 0:
             instructions = [
-                "🎯 Find the gold and escape alive!",
-                "🧠 Use AI reasoning to avoid dangers",
-                "",
                 "Quick Controls:",
                 "SPACE - Manual step  |  A - Auto-play",
-                "H - Help screen  |  M - Moving Wumpus",
-                "R - Restart  |  Q - Quit"
+                "H - Help screen  |  L - Toggle lighting",
+                "M - Moving Wumpus  |  R - Restart  |  Q - Quit"
             ]
+            
+            # Calculate better centering - start controls more centered vertically
+            controls_start_y = HEIGHT // 2 - 50  # More centered position
             
             for i, instruction in enumerate(instructions):
                 if instruction:  # Skip empty lines
@@ -1335,7 +1311,7 @@ def display_welcome_screen():
                     
                     inst_surface = font.render(instruction, True, color)
                     inst_surface.set_alpha(int(min(255, instructions_alpha)))
-                    inst_rect = inst_surface.get_rect(center=(WIDTH//2, 300 + i * 35))
+                    inst_rect = inst_surface.get_rect(center=(WIDTH//2, controls_start_y + i * 40))  # Increased spacing from 35 to 40
                     WIN.blit(inst_surface, inst_rect)
         
         # Press any key prompt
@@ -1351,12 +1327,7 @@ def display_welcome_screen():
     return True
 
 if __name__ == "__main__":
-    print(f"🎮 Starting Wumpus World {GAME_N}x{GAME_N} with {GAME_NUM_WUMPUS} wumpus(es) and {GAME_PIT_PROB:.1%} pit probability")
-    print(f"🤖 Agent type: {'Random Agent' if GAME_AGENT_TYPE == 'random' else 'Knowledge-Based Agent'}")
-    
-    # Display game instructions
-    display_game_instructions()
-    
+
     # Choose which version to run based on config
     if GAME_CONSOLE_MODE:
         # Run console version

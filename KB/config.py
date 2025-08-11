@@ -9,6 +9,7 @@ WIDTH = 800
 HEIGHT = 800
 
 pygame.init()
+pygame.mixer.init()  # Initialize pygame mixer for sound effects
 
 FPS = 30
 
@@ -25,6 +26,7 @@ Examples:
   python main.py 4 1 0.01           # 4x4 grid, 1 wumpus, 1% pits
   python main.py 6 3 0.15 -r        # 6x6 grid, 3 wumpuses, 15% pits, random agent
   python main.py 4 1 0.01 -a --console  # 4x4 grid, KB agent, console mode
+  python main.py 8 2 0.2 --no-light     # Default game with lighting disabled
         """
     )
     
@@ -43,6 +45,8 @@ Examples:
                        help='Use random agent instead of KB agent')
     parser.add_argument('-a', '--kb-agent', action='store_true',
                        help='Use KB agent (default behavior)')
+    parser.add_argument('--no-light', action='store_true',
+                       help='Disable fog of war light effect')
     
     args = parser.parse_args()
     
@@ -71,6 +75,7 @@ GAME_NUM_WUMPUS = args.num_wumpus
 GAME_PIT_PROB = args.pit_prob
 GAME_CONSOLE_MODE = args.console
 GAME_AGENT_TYPE = 'random' if args.random else 'kb'
+GAME_LIGHT_ENABLED = not args.no_light  # Light effect enabled by default
 
 # Use GAME_N for asset scaling and positioning
 N = GAME_N
@@ -93,7 +98,7 @@ ASSETS = os.path.join(os.path.dirname(
 FONT = os.path.join(ASSETS, 'Arial.ttf')
 
 LIGHT = get_assets(ASSETS, 'light.png')[0]
-LIGHT = scale_for_grid(LIGHT, N, "default", WIDTH, HEIGHT)
+LIGHT = scale_for_grid(LIGHT, N, "light", WIDTH, HEIGHT)
 
 hunter_idle_path = os.path.join(ASSETS, 'hunter', 'idle')
 HUNTER_IDLE = get_assets(hunter_idle_path, 'survivor-idle')
@@ -127,6 +132,18 @@ WUMPUS_IDLE = [rotate(x, -90) for x in WUMPUS_IDLE]
 
 wumpus_blood_path = os.path.join(ASSETS, 'wumpus')
 WUMPUS_BLOOD = get_assets(wumpus_blood_path, 'blood')
+
+# Load Wumpus scream sound effect
+wumpus_scream_path = os.path.join(ASSETS, 'wumpus', 'scream.wav')
+WUMPUS_SCREAM_SOUND = None
+if os.path.exists(wumpus_scream_path):
+    try:
+        WUMPUS_SCREAM_SOUND = pygame.mixer.Sound(wumpus_scream_path)
+        print(f"Loaded Wumpus scream sound: {wumpus_scream_path}")
+    except pygame.error as e:
+        print(f"Warning: Could not load Wumpus scream sound: {e}")
+else:
+    print(f"Warning: Wumpus scream sound file not found: {wumpus_scream_path}")
 
 
 GOLD = get_assets(ASSETS, 'gold.png')[0]
