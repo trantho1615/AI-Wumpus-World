@@ -116,9 +116,11 @@ python main.py 4 2 0.02 -a
 
 ## 📁 Project Structure
 
-```
+```bash
 AI-Wumpus-World/
 ├── Source/                     # Main game directory
+│   ├── requirements.txt        # Requirement libraries
+│   ├── README.md               # Description and instruction
 │   ├── main.py                 # Main game with gui implement
 │   ├── config.py               # Configuration and asset loading
 │   ├── environment.py          # Game world and rules
