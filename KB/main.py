@@ -139,6 +139,7 @@ def run_random_agent():
         steps += 1
 
 
+
 def get_tile_type(row, col, N):
     # Corners
     if row == 1 and col == 1:
@@ -454,6 +455,7 @@ def run_game():
             env.apply_action(agent, action)
             env.print_state(agent)
             steps += 1
+
 
 
 if __name__ == "__main__":

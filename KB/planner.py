@@ -1,84 +1,76 @@
 import heapq
+from environment import MOVE_COST  
 
-MOVE_COST = -1
-TURN_COST = -1
-GRAB_REWARD = 10
-SHOOT_COST = -10
-DEATH_COST = -1000
-CLIMB_REWARD_WITH_GOLD = 1000
+# Penalty constants
+UNKNOWN_PENALTY = 5
+DANGER_PENALTY = 50
 
-def heuristic(state, goal, kb):
-    x, y = state
-    gx, gy = goal
-    base = abs(x - gx) + abs(y - gy)
-    penalty = 0
-    for dx, dy in [(0, 1), (1, 0), (-1, 0), (0, -1)]:
-        nx, ny = x + dx, y + dy
-        if ("possible_pit", nx, ny) in kb.facts:
-            penalty += 5  
-    return base + penalty
+def heuristic(a, b, kb):
+    # Khoảng cách Manhattan
+    (x1, y1) = a
+    (x2, y2) = b
+    h = abs(x1 - x2) + abs(y1 - y2)
 
+    # Penalty heuristic nếu ô này có nguy cơ pit
+    if ("possible_pit", x1, y1) in kb.facts or ("possible_wumpus", x1, y1) in kb.facts:
+        h += DANGER_PENALTY // 10  # chỉ tăng nhẹ heuristic, penalty chính cộng vào cost
 
-def get_direction(from_pos, to_pos):
-    dx = to_pos[0] - from_pos[0]
-    dy = to_pos[1] - from_pos[1]
-    if dx == 1:
-        return 'E'
-    elif dx == -1:
-        return 'W'
-    elif dy == 1:
-        return 'N'
-    elif dy == -1:
-        return 'S'
-    return None
+    return h
 
-
-def direction_cost(prev_dir, new_dir):
-    if prev_dir is None or prev_dir == new_dir:
-        return 0
-    return TURN_COST
-
-
-def astar(start, goal, kb, size=4):
-    
-    frontier = [(0, start, None)]  # heap: (priority, position, current_direction)
-    came_from = {}
+def astar(start, goal, kb, map_size, allow_unknown=True):
+    """
+    A* tìm đường từ start đến goal.
+    - allow_unknown=False: chỉ đi ô safe
+    - allow_unknown=True: có thể đi qua ô chưa biết (penalty)
+    """
+    frontier = []
+    heapq.heappush(frontier, (0, start))
+    came_from = {start: None}
     cost_so_far = {start: 0}
-    dir_so_far = {start: None}
 
     while frontier:
-        _, current, current_dir = heapq.heappop(frontier)
+        current_priority, current = heapq.heappop(frontier)
 
         if current == goal:
             break
 
-        for dx, dy in [(0, 1), (1, 0), (-1, 0), (0, -1)]:
-            nx, ny = current[0] + dx, current[1] + dy
-            next_pos = (nx, ny)
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            next_pos = (current[0] + dx, current[1] + dy)
 
-            if 0 <= nx < size and 0 <= ny < size:
-                if ("safe", nx, ny) not in kb.facts:
+            # 1. Check biên bản đồ
+            if not (0 <= next_pos[0] < map_size and 0 <= next_pos[1] < map_size):
+                continue
+
+            # 2. Xác định cost extra dựa trên trạng thái KB
+            if ("safe", next_pos[0], next_pos[1]) in kb.facts:
+                extra_cost = 0
+            elif allow_unknown and not any(f[0] in ("possible_pit", "possible_wumpus") and f[1] == next_pos[0] and f[2] == next_pos[1] for f in kb.facts):
+                extra_cost = UNKNOWN_PENALTY
+            else:
+                # Nếu là dangerous hoặc unknown khi không cho phép, bỏ qua
+                if not allow_unknown:
                     continue
+                # Dangerous => penalty rất cao
+                extra_cost = DANGER_PENALTY
 
-                new_dir = get_direction(current, next_pos)
-                move_cost = MOVE_COST + direction_cost(current_dir, new_dir)
-                new_cost = cost_so_far[current] + move_cost
+            # 3. Tính cost mới
+            new_cost = cost_so_far[current] + MOVE_COST + extra_cost
 
-                if next_pos not in cost_so_far or new_cost > cost_so_far[next_pos]:
-                    cost_so_far[next_pos] = new_cost
-                    priority = -new_cost + heuristic(next_pos, goal, kb)
-                    heapq.heappush(frontier, (priority, next_pos, new_dir))
-                    came_from[next_pos] = current
-                    dir_so_far[next_pos] = new_dir
+            # 4. Cập nhật nếu tìm thấy đường rẻ hơn
+            if next_pos not in cost_so_far or new_cost < cost_so_far[next_pos]:
+                cost_so_far[next_pos] = new_cost
+                priority = new_cost + heuristic(next_pos, goal, kb)
+                heapq.heappush(frontier, (priority, next_pos))
+                came_from[next_pos] = current
 
+    # Truy ngược path
     if goal not in came_from:
-        return None  
-        
+        return None  # Không tìm được đường
 
     path = []
-    cur = goal
-    while cur != start:
-        path.append(cur)
-        cur = came_from[cur]
+    current = goal
+    while current != start:
+        path.append(current)
+        current = came_from[current]
     path.reverse()
     return path

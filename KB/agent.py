@@ -74,15 +74,20 @@ class KBWumpusAgent:
         else:
             self.kb.assert_fact(("no_breeze", x, y))
 
-        if percepts["glitter"]:
-            self.kb.assert_fact(("gold_here", x, y))
-            if not self.has_gold:
-                self.glitter_detected_at = (x, y)
+        if percepts["glitter"] and not self.has_gold:
+            self.glitter_detected_at = self.position
 
         if percepts["stench"]:
             self.kb.assert_fact(("stench", x, y))
         else:
             self.kb.assert_fact(("no_stench", x, y))
+
+        if ("no_breeze", x, y) in self.kb.facts and ("no_stench", x, y) in self.kb.facts:
+            for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.env.size and 0 <= ny < self.env.size:
+                    if ("safe", nx, ny) not in self.kb.facts:
+                        self.kb.assert_fact(("safe", nx, ny))
 
         dx, dy = self._get_delta(self.direction)
         tx, ty = self.position[0] + dx, self.position[1] + dy
@@ -133,6 +138,8 @@ class KBWumpusAgent:
             "W": (-1, 0)
         }[direction]
 
+
+
     def _turn_left(self, dir):
         if dir not in ["N", "E", "S", "W"]:
             print(f"Warning: Invalid direction '{dir}' during left turn. Defaulting to 'N'.")
@@ -149,29 +156,32 @@ class KBWumpusAgent:
         self.last_action_was_shoot = False
 
         x, y = self.position
+
         percepts = self.env.get_percepts(self.position)
 
-        # Grab gold if it's here
-        if not self.has_gold and percepts.get("glitter", False):
+        if percepts.get("glitter", False) and not self.has_gold:
+            print(f"Gold detected at {self.position}, grabbing it and heading home.")
             self.has_gold = True
-            return "grab"
 
-        if self.has_gold:
-            if self.position == (0, 0):
-                return "climb"
-            if not self.plan:
-                path = astar(self.position, (0, 0), self.kb, self.env.size)
+            home_path = self._reverse_path_home()  
+            actions_home = self._path_to_actions(home_path) if home_path else []
+
+            self.plan = ["grab"] + actions_home + ["climb"]
+
+        if self.has_gold and self.plan:
+            return self.plan.pop(0)
+
+        if self.has_gold and self.position == (0, 0):
+            return "climb"
+
+        if self.glitter_detected_at and not self.has_gold:
+            if self.position != self.glitter_detected_at:
+                path = astar(self.position, self.glitter_detected_at, self.kb, self.env.size)
                 if path:
                     self.plan = path
-            if self.plan:
-                return self.get_action_towards(self.plan.pop(0))
-
-        if self.glitter_detected_at and not self.has_gold and self.glitter_detected_at != self.position:
-            path = astar(self.position, self.glitter_detected_at, self.kb, self.env.size)
-            if path:
-                self.plan = path
-                print(f"Returning to glitter location at {self.glitter_detected_at}, path: {path}")
-                return self.get_action_towards(self.plan.pop(0))
+                    return self.get_action_towards(self.plan.pop(0))
+            else:
+                return "grab"
 
         if percepts.get("stench", False) and not self.env.arrow_used:
             dx, dy = self._get_delta(self.direction)
@@ -191,10 +201,15 @@ class KBWumpusAgent:
 
         if self.plan:
             next_move = self.plan[0]
+
+            if next_move == "climb" and self.position != (0, 0):
+                self.plan = self._reverse_path_home() + ["climb"]
+                next_move = self.plan[0]
+
             action = self.get_action_towards(next_move)
-            if action == "move":
+            if action:
                 self.plan.pop(0)
-            return action
+                return action
 
         for safe_cell in self.kb.get_safe_unvisited():
             if safe_cell != self.position and safe_cell not in self.visited:
@@ -212,7 +227,24 @@ class KBWumpusAgent:
                     print(f"[Fallback] Planning to explore: {cell}, path: {path}")
                     return self.get_action_towards(self.plan.pop(0))
 
-        return "wait"
+        unknown_cells = [
+            (nx, ny) for nx in range(self.env.size) for ny in range(self.env.size)
+            if (nx, ny) not in self.visited
+               and ("possible_pit", nx, ny) not in self.kb.facts
+               and ("pit", nx, ny) not in self.kb.facts
+               and ("possible_wumpus", nx, ny) not in self.kb.facts
+        ]
+
+        if unknown_cells:
+            
+            target = min(unknown_cells, key=lambda c: abs(c[0] - self.position[0]) + abs(c[1] - self.position[1]))
+            path = astar(self.position, target, self.kb, self.env.size, allow_unknown=True)
+            if path:
+                self.plan = path
+                return self.get_action_towards(self.plan.pop(0))
+
+        return "wait" 
+
 
     def get_action_towards(self, target):
         dx = target[0] - self.position[0]
@@ -236,3 +268,46 @@ class KBWumpusAgent:
                 return 'turn_right'
 
         return 'move'
+
+    def _reverse_path_home(self):
+        path = astar(self.position, (0, 0), self.kb, self.env.size, allow_unknown=False)
+        return path if path else []
+
+    def _path_to_actions(self, path):
+        """
+        Convert a sequence of positions into a list of turn/move actions.
+        """
+        actions = []
+        current_direction = self.direction
+        current_position = self.position
+
+        for next_pos in path:
+            dx = next_pos[0] - current_position[0]
+            dy = next_pos[1] - current_position[1]
+
+            # Figure out which direction we need to face
+            if dx == 1:
+                target_dir = "E"
+            elif dx == -1:
+                target_dir = "W"
+            elif dy == 1:
+                target_dir = "N"
+            elif dy == -1:
+                target_dir = "S"
+            else:
+                continue  # skip invalid
+
+            # Rotate until facing target_dir
+            while current_direction != target_dir:
+                actions.append("turn_right")
+                current_direction = self._turn_right_direction(current_direction)
+
+            # Move forward
+            actions.append("move")
+            current_position = next_pos
+
+        return actions
+
+    def _turn_right_direction(self, dir):
+        order = ["N", "E", "S", "W"]
+        return order[(order.index(dir) + 1) % 4]
