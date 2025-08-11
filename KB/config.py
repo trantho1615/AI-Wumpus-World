@@ -22,6 +22,10 @@ print(f"Loaded {len(TILE_MAPS)} map tiles: {list(TILE_MAPS.keys())}")
 PIT_PROBABILITY = 0.2  # 20% chance each cell contains a pit
 print(f"Pit probability set to {PIT_PROBABILITY * 100}%")
 
+# Advanced Setting: Moving Wumpus Module (can be toggled during gameplay)
+ADVANCE_SETTING = False  # Default off, can be toggled with 'M' key
+print(f"Moving Wumpus Module (Advance Setting): {'ON' if ADVANCE_SETTING else 'OFF'}")
+
 POSITIONS = generate_positions(N)
 print(POSITIONS)
 pit_pos_index = generate_pit_positions(N, PIT_PROBABILITY)

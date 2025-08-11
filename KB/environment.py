@@ -9,7 +9,7 @@ class Cell:
         self.gold = False
 
 class Environment:
-    def __init__(self, size=4, num_wumpus=2, pit_prob=0.2):
+    def __init__(self, size=4, num_wumpus=2, pit_prob=0.2, advance_setting=False):
         self.size = size
         self.score = 0
         self.grid = [[Cell() for _ in range(size)] for _ in range(size)]
@@ -19,6 +19,7 @@ class Environment:
         self.scream = False
         self.gold_found = False
         # Advanced: Moving Wumpus Module
+        self.advance_setting = advance_setting
         self.action_count = 0
         self.wumpus_positions = []  # Track wumpus positions for movement
         self.place_pit_and_wumpus(num_wumpus, pit_prob)
@@ -134,8 +135,8 @@ class Environment:
                 tx += dx
                 ty += dy
         
-        # Move Wumpus after every 5 actions
-        if self.action_count % 5 == 0:
+        # Move Wumpus after every 5 actions (only if advance setting is enabled)
+        if self.advance_setting and self.action_count % 5 == 0:
             self.move_wumpus(agent)
             
 

@@ -7,7 +7,7 @@ import os
 from config import (
     WIN, TILE_MAPS, N, POSITIONS, LIGHT, FPS, WIDTH, HEIGHT,
     HUNTER_IDLE, WUMPUS_IDLE, GOLD, PIT, 
-    W_BREEZE, W_STENCH, W_BS, W_GOLD, EXIT
+    W_BREEZE, W_STENCH, W_BS, W_GOLD, EXIT, ADVANCE_SETTING
 )
 
 from utils import rotate, load_map
@@ -284,7 +284,9 @@ def draw_percepts(environment, agent):
 
 def run_game_with_gui():
     """Run game with graphical interface and proper asset positioning"""
-    env = Environment(size=N, num_wumpus=2, pit_prob=0.01)
+    # Initialize with advance setting from config
+    advance_enabled = ADVANCE_SETTING
+    env = Environment(size=N, num_wumpus=2, pit_prob=0.01, advance_setting=advance_enabled)
     agent = KBWumpusAgent(env)
     # agent = RandomWumpusAgent(env)  # Use random agent for GUI demo
     
@@ -298,14 +300,16 @@ def run_game_with_gui():
     running = True
     step_count = 0
     auto_step = False
-    step_delay = 1000  # milliseconds between auto steps
+    step_delay = 100  # milliseconds between auto steps
     last_step_time = 0
     
     print("Game started! Controls:")
     print("SPACE - Manual step")
     print("A - Toggle auto-play") 
+    print("M - Toggle Moving Wumpus (Advance Setting)")
     print("R - Reset game")
     print("Q - Quit")
+    print(f"Moving Wumpus Module: {'ON' if advance_enabled else 'OFF'}")
     
     with open("game_log.txt", "w") as log_file:
         while running and not agent.done and step_count < 50:
@@ -337,8 +341,16 @@ def run_game_with_gui():
                         print(log_str)
                         log_file.write(log_str + "\n")
 
+                        # Check if Wumpus will move after this action
+                        will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
+
                         # Apply action
                         env.apply_action(agent, action)
+                        
+                        # Update agent knowledge if Wumpus moved
+                        if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
+                            agent.update_wumpus_knowledge()
+                            
                         env.print_state(agent)
                         hunter.move_to(agent.position[0], agent.position[1], agent.direction)
                         step_count += 1
@@ -346,14 +358,24 @@ def run_game_with_gui():
                         # Toggle auto step
                         auto_step = not auto_step
                         print(f"Auto step: {'ON' if auto_step else 'OFF'}")
+                    elif event.key == pygame.K_m:
+                        # Toggle Moving Wumpus (Advance Setting)
+                        advance_enabled = not advance_enabled
+                        env.advance_setting = advance_enabled
+                        print(f"Moving Wumpus Module: {'ON' if advance_enabled else 'OFF'}")
+                        if advance_enabled:
+                            print("  Wumpus will now move every 5 actions!")
+                        else:
+                            print("  Wumpus movement disabled.")
                     elif event.key == pygame.K_r:
                         # Reset game
-                        env = Environment(size=N, num_wumpus=2, pit_prob=0.2)
+                        env = Environment(size=N, num_wumpus=2, pit_prob=0.2, advance_setting=advance_enabled)
                         agent = KBWumpusAgent(env)
                         hunter.move_to(agent.position[0], agent.position[1], agent.direction)
                         step_count = 0
                         auto_step = False
                         print("Game reset!")
+                        print(f"Moving Wumpus Module: {'ON' if advance_enabled else 'OFF'}")
                     elif event.key == pygame.K_q:
                         running = False
             
@@ -377,7 +399,7 @@ def run_game_with_gui():
                 )
                 print(log_str)
                 # Check if Wumpus will move after this action
-                will_move_wumpus = (env.action_count + 1) % 5 == 0
+                will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
                 log_file.write(log_str + "\n")
 
                 # Apply action
@@ -408,7 +430,7 @@ def run_game_with_gui():
         
         pygame.quit()
 
-def step_game_once(env, agent, step_count):
+def step_game_once(env, agent, step_count, advance_enabled=False):
     """Execute one game step"""
     # Get percepts
     percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
@@ -430,7 +452,7 @@ def step_game_once(env, agent, step_count):
     print(log_str)
 
     # Check if Wumpus will move after this action
-    will_move_wumpus = (env.action_count + 1) % 5 == 0
+    will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
 
     # Apply action
     env.apply_action(agent, action)
@@ -444,7 +466,7 @@ def step_game_once(env, agent, step_count):
     return log_str
 
 def run_game():
-    env = Environment(size=4, num_wumpus=1, pit_prob=0.2)
+    env = Environment(size=4, num_wumpus=1, pit_prob=0.2, advance_setting=ADVANCE_SETTING)
     agent = KBWumpusAgent(env)
 
     steps = 0
