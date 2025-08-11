@@ -738,7 +738,7 @@ def run_single_game(env, agent, advance_enabled):
     pygame.event.clear()
     
     with open("game_log.txt", "w") as log_file:
-        while running and not agent.done and step_count < 50:
+        while running and not agent.done and step_count <= 50:
             current_time = pygame.time.get_ticks()
             
             # Handle events
@@ -962,7 +962,7 @@ def run_single_game(env, agent, advance_enabled):
             else:
                 game_result = "death"
                 choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
-        elif step_count >= 100:
+        elif step_count > 50:
             game_result = "timeout"
             choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
         else:

@@ -276,10 +276,21 @@ class KBWumpusAgent:
             return 'wait'
 
         if self.direction != desired_dir:
-            if self._turn_left(self.direction) == desired_dir:
-                return 'turn_left'
-            else:
+            # Calculate the most efficient turn direction
+            # Define direction order: N, E, S, W (clockwise)
+            directions = ["N", "E", "S", "W"]
+            current_index = directions.index(self.direction)
+            desired_index = directions.index(desired_dir)
+            
+            # Calculate steps needed for both directions
+            right_steps = (desired_index - current_index) % 4
+            left_steps = (current_index - desired_index) % 4
+            
+            # Choose the direction that requires fewer steps
+            if right_steps <= left_steps:
                 return 'turn_right'
+            else:
+                return 'turn_left'
 
         return 'move'
     # Reverse path to home
@@ -311,10 +322,24 @@ class KBWumpusAgent:
             else:
                 continue  # skip invalid
 
-            # Rotate until facing target_dir
+            # Rotate to face target_dir using the most efficient path
             while current_direction != target_dir:
-                actions.append("turn_right")
-                current_direction = self._turn_right_direction(current_direction)
+                # Calculate the most efficient turn direction
+                directions = ["N", "E", "S", "W"]
+                current_index = directions.index(current_direction)
+                target_index = directions.index(target_dir)
+                
+                # Calculate steps needed for both directions
+                right_steps = (target_index - current_index) % 4
+                left_steps = (current_index - target_index) % 4
+                
+                # Choose the direction that requires fewer steps
+                if right_steps <= left_steps:
+                    actions.append("turn_right")
+                    current_direction = self._turn_right_direction(current_direction)
+                else:
+                    actions.append("turn_left")
+                    current_direction = self._turn_left(current_direction)
 
             # Move forward
             actions.append("move")
