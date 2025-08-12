@@ -252,9 +252,6 @@ def run_random_agent():
         percepts["bump"] = getattr(agent, "bump", False)
         percepts["scream"] = env.scream
         
-        # Play scream sound if Wumpus was killed
-        if env.scream and WUMPUS_SCREAM_SOUND:
-            WUMPUS_SCREAM_SOUND.play()
 
         action = agent.choose_action()
         print(f"[Step {steps}] Action: {action}")
@@ -458,10 +455,7 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
                 subtitle_text = "Killed by the Wumpus!"
             elif env.death_cause == "pit":
                 subtitle_text = "Fell into a Pit!"
-            else:
-                subtitle_text = "Did Not Survive"
-        else:
-            subtitle_text = "Did Not Survive"
+        
 
         effect_particles = False
     elif game_result == "timeout":
@@ -753,9 +747,6 @@ def run_single_game(env, agent, advance_enabled):
                         percepts["bump"] = getattr(agent, "bump", False)
                         percepts["scream"] = env.scream
                         
-                        # Play scream sound if Wumpus was killed
-                        if env.scream and WUMPUS_SCREAM_SOUND:
-                            WUMPUS_SCREAM_SOUND.play()
 
                         # Agent chooses action
                         action = agent.choose_action()
@@ -909,10 +900,6 @@ def run_single_game(env, agent, advance_enabled):
                 agent.perceive(percepts)
                 percepts["bump"] = getattr(agent, "bump", False)
                 percepts["scream"] = env.scream
-                
-                # Play scream sound if Wumpus was killed
-                if env.scream and WUMPUS_SCREAM_SOUND:
-                    WUMPUS_SCREAM_SOUND.play()
 
                 # Agent chooses action
                 action = agent.choose_action()
@@ -980,45 +967,6 @@ def run_single_game(env, agent, advance_enabled):
         pygame.quit()
         return 'end'
 
-def step_game_once(env, agent, step_count, advance_enabled=False):
-    """Execute one game step"""
-    # Get percepts
-    percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
-    agent.perceive(percepts)
-    percepts["bump"] = getattr(agent, "bump", False)
-    percepts["scream"] = env.scream
-    
-    # Play scream sound if Wumpus was killed
-    if env.scream and WUMPUS_SCREAM_SOUND:
-        WUMPUS_SCREAM_SOUND.play()
-
-    # Agent chooses action
-    action = agent.choose_action()
-
-    # Log step
-    log_str = (
-        f"[Step {step_count + 1}] Action: {action}, "
-        f"Position: {agent.position}, "
-        f"Direction: {agent.direction}, "
-        f"Has Gold: {agent.has_gold}, "
-        f"Percepts: {percepts}"
-    )
-    print(log_str)
-
-    # Check if Wumpus will move after this action
-    will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
-
-    # Apply action
-    env.apply_action(agent, action)
-    
-    # Update agent knowledge if Wumpus moved
-    if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
-        agent.update_wumpus_knowledge()
-    
-    env.print_state(agent)
-
-    return log_str
-
 def run_game():
     env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB, advance_setting=ADVANCE_SETTING)
     agent = KBWumpusAgent(env)
@@ -1034,9 +982,6 @@ def run_game():
             percepts["bump"] = getattr(agent, "bump", False)
             percepts["scream"] = env.scream
             
-            # Play scream sound if Wumpus was killed
-            if env.scream and WUMPUS_SCREAM_SOUND:
-                WUMPUS_SCREAM_SOUND.play()
 
             action = agent.choose_action()
 

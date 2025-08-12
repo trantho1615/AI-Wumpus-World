@@ -132,6 +132,15 @@ class Environment:
                         self.wumpus_positions.remove((tx, ty))
                     self.scream = True
                     print(f">>> Wumpus at ({tx},{ty}) has been eliminated!")
+                    
+                    # Play scream sound immediately when Wumpus is killed
+                    try:
+                        from config import WUMPUS_SCREAM_SOUND
+                        if WUMPUS_SCREAM_SOUND:
+                            WUMPUS_SCREAM_SOUND.play()
+                    except ImportError:
+                        pass  # Handle case where sound isn't available
+                    
                     break
                 tx += dx
                 ty += dy

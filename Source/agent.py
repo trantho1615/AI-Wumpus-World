@@ -138,6 +138,7 @@ class KBWumpusAgent:
         self.kb.infer()
         print("KB Facts:", self.kb.facts)
         self.bump = False
+
     # Update knowledge base when Wumpus positions may have changed
     def update_wumpus_knowledge(self):
         """Update knowledge base when Wumpus positions may have changed"""
@@ -159,8 +160,6 @@ class KBWumpusAgent:
             "S": (0, -1),
             "W": (-1, 0)
         }[direction]
-
-
 
     def _turn_left(self, dir):
         if dir not in ["N", "E", "S", "W"]:
@@ -248,6 +247,7 @@ class KBWumpusAgent:
                     self.plan = path
                     print(f"[Fallback] Planning to explore: {cell}, path: {path}")
                     return self.get_action_towards(self.plan.pop(0))
+                
         # Explore unknown cells
         unknown_cells = [
             (nx, ny) for nx in range(self.env.size) for ny in range(self.env.size)
@@ -258,7 +258,6 @@ class KBWumpusAgent:
         ]
 
         if unknown_cells:
-            
             target = min(unknown_cells, key=lambda c: abs(c[0] - self.position[0]) + abs(c[1] - self.position[1]))
             path = astar(self.position, target, self.kb, self.env.size, allow_unknown=True)
             if path:
