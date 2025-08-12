@@ -429,7 +429,10 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
                 subtitle_text = "Killed by the Wumpus!"
             elif env.death_cause == "pit":
                 subtitle_text = "Fell into a Pit!"
-        
+            else:
+                subtitle_text = "Climb out without gold"
+        else:
+            subtitle_text = "Climb out without gold"
 
         effect_particles = False
     elif game_result == "timeout":
@@ -919,7 +922,7 @@ def run_game_with_gui():
     
     # Show visual welcome screen first
     print("Loading Wumpus World...")
-    pygame.display.set_caption("AI Wumpus World")
+    pygame.display.set_caption("AI - Wumpus World")
     
     # Display visual welcome screen
     continue_game = display_welcome_screen()
