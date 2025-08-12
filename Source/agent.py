@@ -25,7 +25,15 @@ class RandomWumpusAgent:
         if not self.arrow_used and random.random() < 0.1:
             self.arrow_used = True
             return "shoot"
-        return random.choice(self.actions)
+        
+        # Create weighted action list with higher probability for move, turn_left, turn_right
+        weighted_actions = (
+            ["move"] * 6 +           # 40% probability
+            ["turn_left"] * 2 +      # 30% probability  
+            ["turn_right"] * 2 +     # 30% probability
+            ["shoot", "grab", "climb"]  # 10% total for other actions
+        )
+        return random.choice(weighted_actions)
 
     def update_position_on_move(self):
         dx, dy = self._get_delta(self.direction)
