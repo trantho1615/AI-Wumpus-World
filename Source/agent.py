@@ -28,9 +28,9 @@ class RandomWumpusAgent:
         
         # Create weighted action list with higher probability for move, turn_left, turn_right
         weighted_actions = (
-            ["move"] * 6 +           # 40% probability
-            ["turn_left"] * 2 +      # 30% probability  
-            ["turn_right"] * 2 +     # 30% probability
+            ["move"] * 6 +           # 60% probability
+            ["turn_left"] * 2 +      # 20% probability
+            ["turn_right"] * 2 +     # 20% probability
             ["shoot", "grab", "climb"]  # 10% total for other actions
         )
         return random.choice(weighted_actions)
