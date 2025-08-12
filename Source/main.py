@@ -2,9 +2,6 @@ from environment import Environment
 from agent import KBWumpusAgent
 from agent import RandomWumpusAgent
 import pygame
-import os
-import sys
-import time
 import math
 import random
 
@@ -23,9 +20,7 @@ announcement_text = ""
 announcement_timer = 0
 announcement_type = "info"  # "info", "success", "warning"
 
-# Global variables for game configuration (set via command line arguments)
-
-
+# Set of functions to manage visual announcements
 def display_visual_announcement(text, duration=3000, ann_type="info"):
     """Display announcement on game screen"""
     global announcement_text, announcement_timer, announcement_type
@@ -108,6 +103,8 @@ def get_pixel_position(grid_x, grid_y):
         return POSITIONS[grid_y][grid_x]  # POSITIONS[row][col]
     return (0, 0)  # Default position if out of bounds
 
+
+# Base class for drawable game elements
 class GameElement:
     """Base class for drawable game elements"""
     def __init__(self, grid_x, grid_y, image):
@@ -241,31 +238,7 @@ class PerceptElement(GameElement):
         image = percept_images.get(percept_type, None)
         super().__init__(grid_x, grid_y, image)
 
-def run_random_agent():
-    env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB)
-    agent = RandomWumpusAgent(env)
-
-    steps = 0
-    while not agent.done and steps < 50:
-        percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
-        agent.perceive(percepts)
-        percepts["bump"] = getattr(agent, "bump", False)
-        percepts["scream"] = env.scream
-        
-
-        action = agent.choose_action()
-        print(f"[Step {steps}] Action: {action}")
-
-        env.apply_action(agent, action)
-        
-        if action == "move":
-            agent.update_position_on_move()
-
-        env.print_state(agent)
-        steps += 1
-
-
-
+# Function to determine map tile type based on position
 def get_tile_type(row, col, N):
     # Corners
     if row == 0 and col == 0:
@@ -293,6 +266,7 @@ def get_tile_type(row, col, N):
         return 'map22'
 
 
+# Set of function to draw the game window
 def draw_window(environment, agent, game_elements=None, light=None):
     """Update the window with all game elements"""
     WIN.fill((0, 0, 0))  # Clear screen with black
@@ -644,373 +618,12 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
     print()
     return 'continue'
 
-def run_game_with_gui():
-    """Run game with graphical interface and proper asset positioning"""
-    
-    # Show visual welcome screen first
-    print("Loading Wumpus World...")
-    pygame.display.set_caption("Wumpus World - Loading...")
-    
-    # Display visual welcome screen
-    continue_game = display_welcome_screen()
-    if not continue_game:
-        pygame.quit()
-        return
-    
-    while True:
-        # Initialize with advance setting from config
-        advance_enabled = ADVANCE_SETTING
-        env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB, advance_setting=advance_enabled)
-        
-        # Create agent based on global setting
-        if GAME_AGENT_TYPE == "random":
-            agent = RandomWumpusAgent(env)
-        else:
-            agent = KBWumpusAgent(env)
-        
-        # Clear event queue before starting each game instance
-        pygame.event.clear()
-        
-        result = run_single_game(env, agent, advance_enabled)
-        
-        if result == 'restart':
-            pygame.quit()
-            pygame.init()
-            global WIN, clock
-            WIN = pygame.display.set_mode((WIDTH, HEIGHT))
-            pygame.display.set_caption("Wumpus World")
-            clock = pygame.time.Clock()
-            # Clear any accumulated events after reinitialization
-            pygame.event.clear()
-            continue  # Restart the game loop
-        else:
-            break  # Exit for 'quit' or 'end'
-
-def run_single_game(env, agent, advance_enabled):
-    """Run a single game instance"""
-    global GAME_LIGHT_ENABLED
-    # agent = RandomWumpusAgent(env)  # Use random agent for GUI demo
-    
-    # Create hunter sprite
-    hunter = Hunter(agent.position[0], agent.position[1], agent.direction)
-    all_sprites = pygame.sprite.Group()
-    all_sprites.add(hunter)
-    
-    # Create light object for fog of war effect (if enabled)
-    light = None
-    if GAME_LIGHT_ENABLED:
-        light = Light()
-        # Initialize light with hunter's starting position
-        light.update(hunter)
-
-    # Game state
-    clock = pygame.time.Clock()
-    running = True
-    step_count = 0
-    auto_step = False
-    step_delay = 100  # milliseconds between auto steps
-    last_step_time = 0
-    
-    print("\n" + "="*60)
-    print("🎮 WUMPUS WORLD - GAME STARTED!")
-    print("="*60)
-    print("🎮 CONTROLS:")
-    print("  SPACE - Execute manual step")
-    print("  A     - Toggle auto-play mode")
-    print("  M     - Toggle Moving Wumpus (Advance Setting)")
-    print("  L     - Toggle fog of war lighting effect")
-    print("  R     - Reset/Restart game")
-    print("  H     - Show in-game help")
-    print("  Q     - Quit game")
-    print("\n🎯 CURRENT SETTINGS:")
-    print(f"  Moving Wumpus Module: {'🟢 ACTIVATED' if advance_enabled else '🔴 DEACTIVATED'}")
-    if advance_enabled:
-        print("  ⚠️  Wumpuses will move every 5 actions!")
-    print(f"  Fog of War Lighting: {'🟢 ENABLED' if GAME_LIGHT_ENABLED else '🔴 DISABLED'}")
-    print(f"  Auto-play: 🔴 DEACTIVATED (Press A to toggle)")
-    print("="*60)
-    
-    # Clear any accumulated events before starting the main game loop
-    pygame.event.clear()
-    
-    with open("game_log.txt", "w") as log_file:
-        while running and not agent.done and step_count <= 50:
-            current_time = pygame.time.get_ticks()
-            
-            # Handle events
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        # Manual step
-                        percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
-                        agent.perceive(percepts)
-                        percepts["bump"] = getattr(agent, "bump", False)
-                        percepts["scream"] = env.scream
-                        
-
-                        # Agent chooses action
-                        action = agent.choose_action()
-
-                        # Log step
-                        log_str = (
-                            f"[Step {step_count + 1}] Action: {action}, "
-                            f"Position: {agent.position}, "
-                            f"Direction: {agent.direction}, "
-                            f"Has Gold: {agent.has_gold}, "
-                            f"Percepts: {percepts}"
-                        )
-                        print(log_str)
-                        log_file.write(log_str + "\n")
-
-                        # Check if Wumpus will move after this action
-                        will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
-
-                        # Apply action
-                        env.apply_action(agent, action)
-                        
-                        # Update agent knowledge if Wumpus moved
-                        if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
-                            agent.update_wumpus_knowledge()
-                            
-                        env.print_state(agent)
-                        hunter.move_to(agent.position[0], agent.position[1], agent.direction)
-                        if light:
-                            light.update(hunter)
-                        step_count += 1
-                    elif event.key == pygame.K_a:
-                        # Toggle auto step
-                        auto_step = not auto_step
-                        
-                        # Visual announcement on game screen
-                        if auto_step:
-                            display_visual_announcement("🤖 AUTO-PLAY ACTIVATED - AI Taking Control!", 1000, "success")
-                        else:
-                            display_visual_announcement("🎮 MANUAL MODE - You Have Control!", 1000, "info")
-                        
-                        # Console announcement
-                        print("\n" + "="*50)
-                        print(f"🤖 AUTO-PLAY MODE: {'🟢 ACTIVATED' if auto_step else '🔴 DEACTIVATED'}")
-                        print("="*50)
-                        if auto_step:
-                            print("✨ Agent will now execute moves automatically!")
-                            print("📝 Watch the AI make intelligent decisions!")
-                            print("⏸️  Press A again to return to manual mode")
-                        else:
-                            print("🎮 Manual control restored!")
-                            print("👆 Use SPACE to execute each step carefully")
-                            print("🔄 Press A again to re-enable auto-play")
-                        print("="*50)
-                    elif event.key == pygame.K_m:
-                        # Toggle Moving Wumpus (Advance Setting)
-                        advance_enabled = not advance_enabled
-                        env.advance_setting = advance_enabled
-                        
-                        # Visual announcement on game screen
-                        if advance_enabled:
-                            display_visual_announcement("🐉 MOVING WUMPUS ACTIVATED - DANGER INCREASED!", 1000, "warning")
-                        else:
-                            display_visual_announcement("🛡️ CLASSIC MODE - WUMPUSES NOW STATIONARY", 1000, "success")
-                        
-                        # Console announcement
-                        print("\n" + "="*60)
-                        print(f"🐉 MOVING WUMPUS MODULE: {'🟢 ACTIVATED' if advance_enabled else '🔴 DEACTIVATED'}")
-                        print("="*60)
-                        if advance_enabled:
-                            print("⚠️  DANGER LEVEL INCREASED!")
-                            print("🎯 Wumpuses will now move every 5 actions!")
-                            print("💀 Be extra careful - they can hunt you down!")
-                            print("🧠 Agent knowledge will adapt to moving threats")
-                            print("🔥 Challenge mode engaged!")
-                        else:
-                            print("🛡️  Classic mode restored!")
-                            print("🎮 Wumpuses are now stationary (Original gameplay)")
-                            print("📚 Perfect for learning the basics")
-                            print("🎯 Focus on knowledge base reasoning")
-                        print("="*60)
-                    elif event.key == pygame.K_r:
-                        # Reset game
-                        env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB, advance_setting=advance_enabled)
-                        
-                        # Create new agent based on global setting
-                        if GAME_AGENT_TYPE == "random":
-                            agent = RandomWumpusAgent(env)
-                        else:
-                            agent = KBWumpusAgent(env)
-                            
-                        hunter.move_to(agent.position[0], agent.position[1], agent.direction)
-                        # Reset light for new game (if enabled)
-                        light = None
-                        if GAME_LIGHT_ENABLED:
-                            light = Light()
-                            light.update(hunter)
-                        step_count = 0
-                        auto_step = False
-                        
-                        # Clear any existing visual announcements
-                        clear_visual_announcement()
-                        
-                        # Console announcement
-                        print("\n" + "="*50)
-                        print("🔄 GAME RESET - NEW ADVENTURE BEGINS!")
-                        print("="*50)
-                        print("🌍 Fresh environment generated!")
-                        print("🤖 Agent repositioned at start")
-                        print(f"🎯 Settings: Moving Wumpus {'🟢 ON' if advance_enabled else '🔴 OFF'}")
-                        print("📊 Step counter reset to 0")
-                        print("🎮 Auto-play disabled (Use A to toggle)")
-                        print("="*50)
-                    elif event.key == pygame.K_h:
-                        # Display visual instructions overlay
-                        continue_game = display_visual_instructions()
-                        if not continue_game:
-                            running = False
-                    elif event.key == pygame.K_l:
-                        # Toggle light effect
-                        GAME_LIGHT_ENABLED = not GAME_LIGHT_ENABLED
-                        
-                        if GAME_LIGHT_ENABLED:
-                            # Re-enable light
-                            if light is None:
-                                light = Light()
-                                light.update(hunter)
-                            display_visual_announcement("💡 FOG OF WAR LIGHTING - ENABLED!", 1000, "success")
-                        else:
-                            # Disable light
-                            display_visual_announcement("🌕 FULL VISIBILITY - LIGHTING DISABLED!", 1000, "info")
-                        
-                        # Console announcement
-                        print("\n" + "="*50)
-                        print(f"💡 FOG OF WAR LIGHTING: {'🟢 ENABLED' if GAME_LIGHT_ENABLED else '🔴 DISABLED'}")
-                        print("="*50)
-                        if GAME_LIGHT_ENABLED:
-                            print("🌫️  Fog of war effect activated!")
-                            print("🔦 Light reveals areas as you explore")
-                            print("🕳️  Unexplored areas remain in darkness")
-                        else:
-                            print("🌕 Full visibility restored!")
-                            print("👁️  All areas are clearly visible")
-                            print("🗺️  Perfect for strategic planning")
-                        print("="*50)
-                    elif event.key == pygame.K_q:
-                        running = False
-            
-            # Auto step
-            if auto_step and current_time - last_step_time >= step_delay:
-                percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
-                agent.perceive(percepts)
-                percepts["bump"] = getattr(agent, "bump", False)
-                percepts["scream"] = env.scream
-
-                # Agent chooses action
-                action = agent.choose_action()
-
-                # Log step
-                log_str = (
-                    f"[Step {step_count + 1}] Action: {action}, "
-                    f"Position: {agent.position}, "
-                    f"Direction: {agent.direction}, "
-                    f"Has Gold: {agent.has_gold}, "
-                    f"Percepts: {percepts}"
-                )
-                print(log_str)
-                # Check if Wumpus will move after this action
-                will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
-                log_file.write(log_str + "\n")
-
-                # Apply action
-                env.apply_action(agent, action)
-                
-                # Update agent knowledge if Wumpus moved
-                if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
-                    agent.update_wumpus_knowledge()
-                env.print_state(agent)
-                hunter.move_to(agent.position[0], agent.position[1], agent.direction)
-                if light:
-                    light.update(hunter)
-                step_count += 1
-                last_step_time = current_time
-            
-            # Update sprites
-            all_sprites.update()
-            
-            # Update light with current hunter position
-            if light:
-                light.update(hunter)
-            
-            # Draw everything with proper positioning
-            draw_window(env, agent, all_sprites, light)
-            clock.tick(FPS)
-        
-        # Game over
-        if agent.done:
-            if agent.has_gold and agent.position == (0, 0):
-                game_result = "victory"
-                choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
-            else:
-                game_result = "death"
-                choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
-        elif step_count > 50:
-            game_result = "timeout"
-            choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
-        else:
-            choice = None
-        
-        # Handle post-game choices
-        if choice == 'restart':
-            print("Restarting game...")
-            return 'restart'  # Return restart signal to caller
-        elif choice == 'quit':
-            print("Exiting game...")
-            return 'quit'  # Return quit signal to caller
-        # If choice is 'continue' or None, the game loop continues normally
-        
-        pygame.quit()
-        return 'end'
-
-def run_game():
-    env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB, advance_setting=ADVANCE_SETTING)
-    agent = KBWumpusAgent(env)
-
-    steps = 0
-
-    # Open the file for writing logs
-    with open("game_log.txt", "w") as log_file:
-        while not agent.done and steps < 50:
-            percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
-            agent.perceive(percepts)
-
-            percepts["bump"] = getattr(agent, "bump", False)
-            percepts["scream"] = env.scream
-            
-
-            action = agent.choose_action()
-
-            # Create the log string
-            log_str = (
-                f"[Step {steps}] Action: {action}, "
-                f"Position: {agent.position}, "
-                f"Direction: {agent.direction}, "
-                f"Has Gold: {agent.has_gold}, "
-                f"Scream: {percepts.get('scream', False)}, "
-                f"Bump: {percepts.get('bump', False)}"
-            )
-
-            print(log_str)
-            log_file.write(log_str + "\n")
-
-            env.apply_action(agent, action)
-            env.print_state(agent)
-            steps += 1
-
-
 def display_in_game_help(advance_enabled, auto_step):
     """Display concise in-game help during gameplay"""
     print("\n" + "="*50)
-    print("📋 QUICK HELP")
+    print("QUICK HELP")
     print("="*50)
-    print("🎮 CONTROLS:")
+    print("CONTROLS:")
     print("  SPACE - Manual step")
     print("  A     - Toggle auto-play")
     print("  M     - Toggle Moving Wumpus")
@@ -1018,11 +631,11 @@ def display_in_game_help(advance_enabled, auto_step):
     print("  H     - Show this help")
     print("  Q     - Quit")
     
-    print("\n🎯 CURRENT STATUS:")
-    print(f"  Auto-play: {'🟢 ON' if auto_step else '🔴 OFF'}")
-    print(f"  Moving Wumpus: {'🟢 ON' if advance_enabled else '🔴 OFF'}")
-    
-    print("\n🧠 GAME ELEMENTS:")
+    print("\nCURRENT STATUS:")
+    print(f"  Auto-play: {'ON' if auto_step else 'OFF'}")
+    print(f"  Moving Wumpus: {'ON' if advance_enabled else 'OFF'}")
+
+    print("\nGAME ELEMENTS:")
     print("  A=Agent, W=Wumpus, G=Gold, P=Pit")
     print("  Percepts: Stench(Wumpus nearby), Breeze(Pit nearby)")
     print("="*50)
@@ -1275,6 +888,393 @@ def display_welcome_screen():
         clock.tick(60)
     
     return True
+
+# Function to run random agent
+def run_random_agent():
+    env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB)
+    agent = RandomWumpusAgent(env)
+
+    steps = 0
+    while not agent.done and steps < 50:
+        percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
+        agent.perceive(percepts)
+        percepts["bump"] = getattr(agent, "bump", False)
+        percepts["scream"] = env.scream
+        
+
+        action = agent.choose_action()
+        print(f"[Step {steps}] Action: {action}")
+
+        env.apply_action(agent, action)
+        
+        if action == "move":
+            agent.update_position_on_move()
+
+        env.print_state(agent)
+        steps += 1
+
+# Function to run game with GUI
+def run_game_with_gui():
+    """Run game with graphical interface and proper asset positioning"""
+    
+    # Show visual welcome screen first
+    print("Loading Wumpus World...")
+    pygame.display.set_caption("AI Wumpus World")
+    
+    # Display visual welcome screen
+    continue_game = display_welcome_screen()
+    if not continue_game:
+        pygame.quit()
+        return
+    
+    while True:
+        # Initialize with advance setting from config
+        advance_enabled = ADVANCE_SETTING
+        env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB, advance_setting=advance_enabled)
+        
+        # Create agent based on global setting
+        if GAME_AGENT_TYPE == "random":
+            agent = RandomWumpusAgent(env)
+        else:
+            agent = KBWumpusAgent(env)
+        
+        # Clear event queue before starting each game instance
+        pygame.event.clear()
+        
+        result = run_single_game(env, agent, advance_enabled)
+        
+        if result == 'restart':
+            pygame.quit()
+            pygame.init()
+            global WIN, clock
+            WIN = pygame.display.set_mode((WIDTH, HEIGHT))
+            pygame.display.set_caption("Wumpus World")
+            clock = pygame.time.Clock()
+            # Clear any accumulated events after reinitialization
+            pygame.event.clear()
+            continue  # Restart the game loop
+        else:
+            break  # Exit for 'quit' or 'end'
+
+# Function to run a single game instance
+def run_single_game(env, agent, advance_enabled):
+    """Run a single game instance"""
+    global GAME_LIGHT_ENABLED
+    # agent = RandomWumpusAgent(env)  # Use random agent for GUI demo
+    
+    # Create hunter sprite
+    hunter = Hunter(agent.position[0], agent.position[1], agent.direction)
+    all_sprites = pygame.sprite.Group()
+    all_sprites.add(hunter)
+    
+    # Create light object for fog of war effect (if enabled)
+    light = None
+    if GAME_LIGHT_ENABLED:
+        light = Light()
+        # Initialize light with hunter's starting position
+        light.update(hunter)
+
+    # Game state
+    clock = pygame.time.Clock()
+    running = True
+    step_count = 0
+    auto_step = False
+    step_delay = 100  # milliseconds between auto steps
+    last_step_time = 0
+    
+    print("\n" + "="*60)
+    print("WUMPUS WORLD - GAME STARTED!")
+    print("="*60)
+    print("CONTROLS:")
+    print("  SPACE - Execute manual step")
+    print("  A     - Toggle auto-play mode")
+    print("  M     - Toggle Moving Wumpus (Advance Setting)")
+    print("  L     - Toggle fog of war lighting effect")
+    print("  R     - Reset/Restart game")
+    print("  H     - Show in-game help")
+    print("  Q     - Quit game")
+    print("\nCURRENT SETTINGS:")
+    print(f"  Moving Wumpus Module: {' ACTIVATED' if advance_enabled else ' DEACTIVATED'}")
+    if advance_enabled:
+        print("   Wumpuses will move every 5 actions!")
+    print(f"  Fog of War Lighting: {' ENABLED' if GAME_LIGHT_ENABLED else ' DISABLED'}")
+    print(f"  Auto-play:  DEACTIVATED (Press A to toggle)")
+    print("="*60)
+    
+    # Clear any accumulated events before starting the main game loop
+    pygame.event.clear()
+    
+    with open("game_log.txt", "w") as log_file:
+        while running and not agent.done and step_count <= 50:
+            current_time = pygame.time.get_ticks()
+            
+            # Handle events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        # Manual step
+                        percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
+                        agent.perceive(percepts)
+                        percepts["bump"] = getattr(agent, "bump", False)
+                        percepts["scream"] = env.scream
+                        
+
+                        # Agent chooses action
+                        action = agent.choose_action()
+
+                        # Log step
+                        log_str = (
+                            f"[Step {step_count + 1}] Action: {action}, "
+                            f"Position: {agent.position}, "
+                            f"Direction: {agent.direction}, "
+                            f"Has Gold: {agent.has_gold}, "
+                            f"Percepts: {percepts}"
+                        )
+                        print(log_str)
+                        log_file.write(log_str + "\n")
+
+                        # Check if Wumpus will move after this action
+                        will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
+
+                        # Apply action
+                        env.apply_action(agent, action)
+                        
+                        # Update agent knowledge if Wumpus moved
+                        if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
+                            agent.update_wumpus_knowledge()
+                            
+                        env.print_state(agent)
+                        hunter.move_to(agent.position[0], agent.position[1], agent.direction)
+                        if light:
+                            light.update(hunter)
+                        step_count += 1
+                    elif event.key == pygame.K_a:
+                        # Toggle auto step
+                        auto_step = not auto_step
+                        
+                        # Visual announcement on game screen
+                        if auto_step:
+                            display_visual_announcement(" AUTO-PLAY ACTIVATED - AI Taking Control!", 1000, "success")
+                        else:
+                            display_visual_announcement(" MANUAL MODE - You Have Control!", 1000, "info")
+                        
+                        # Console announcement
+                        print("\n" + "="*50)
+                        print(f" AUTO-PLAY MODE: {' ACTIVATED' if auto_step else ' DEACTIVATED'}")
+                        print("="*50)
+                        if auto_step:
+                            print(" Agent will now execute moves automatically!")
+                            print(" Watch the AI make intelligent decisions!")
+                            print("⏸  Press A again to return to manual mode")
+                        else:
+                            print(" Manual control restored!")
+                            print(" Use SPACE to execute each step carefully")
+                            print(" Press A again to re-enable auto-play")
+                        print("="*50)
+                    elif event.key == pygame.K_m:
+                        # Toggle Moving Wumpus (Advance Setting)
+                        advance_enabled = not advance_enabled
+                        env.advance_setting = advance_enabled
+                        
+                        # Visual announcement on game screen
+                        if advance_enabled:
+                            display_visual_announcement(" MOVING WUMPUS ACTIVATED - DANGER INCREASED!", 1000, "warning")
+                        else:
+                            display_visual_announcement(" CLASSIC MODE - WUMPUSES NOW STATIONARY", 1000, "success")
+                        
+                        # Console announcement
+                        print("\n" + "="*60)
+                        print(f" MOVING WUMPUS MODULE: {' ACTIVATED' if advance_enabled else ' DEACTIVATED'}")
+                        print("="*60)
+                        if advance_enabled:
+                            print(" DANGER LEVEL INCREASED!")
+                            print(" Wumpuses will now move every 5 actions!")
+                            print(" Be extra careful - they can hunt you down!")
+                            print(" Agent knowledge will adapt to moving threats")
+                            print(" Challenge mode engaged!")
+                        else:
+                            print(" Classic mode restored!")
+                            print(" Wumpuses are now stationary (Original gameplay)")
+                            print(" Perfect for learning the basics")
+                            print(" Focus on knowledge base reasoning")
+                        print("="*60)
+                    elif event.key == pygame.K_r:
+                        # Reset game
+                        env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB, advance_setting=advance_enabled)
+                        
+                        # Create new agent based on global setting
+                        if GAME_AGENT_TYPE == "random":
+                            agent = RandomWumpusAgent(env)
+                        else:
+                            agent = KBWumpusAgent(env)
+                            
+                        hunter.move_to(agent.position[0], agent.position[1], agent.direction)
+                        # Reset light for new game (if enabled)
+                        light = None
+                        if GAME_LIGHT_ENABLED:
+                            light = Light()
+                            light.update(hunter)
+                        step_count = 0
+                        auto_step = False
+                        
+                        # Clear any existing visual announcements
+                        clear_visual_announcement()
+                        
+                        # Console announcement
+                        print("\n" + "="*50)
+                        print("GAME RESET - NEW ADVENTURE BEGINS!")
+                        print("="*50)
+                        print("Fresh environment generated!")
+                        print("Agent repositioned at start")
+                        print(f"Settings: Moving Wumpus {'ON' if advance_enabled else 'OFF'}")
+                        print("Step counter reset to 0")
+                        print("Auto-play disabled (Use A to toggle)")
+                        print("="*50)
+                    elif event.key == pygame.K_h:
+                        # Display visual instructions overlay
+                        continue_game = display_visual_instructions()
+                        if not continue_game:
+                            running = False
+                    elif event.key == pygame.K_l:
+                        # Toggle light effect
+                        GAME_LIGHT_ENABLED = not GAME_LIGHT_ENABLED
+                        
+                        if GAME_LIGHT_ENABLED:
+                            # Re-enable light
+                            if light is None:
+                                light = Light()
+                                light.update(hunter)
+                            display_visual_announcement("FOG OF WAR LIGHTING - ENABLED!", 1000, "success")
+                        else:
+                            # Disable light
+                            display_visual_announcement("FULL VISIBILITY - LIGHTING DISABLED!", 1000, "info")
+                        
+                        # Console announcement
+                        print("\n" + "="*50)
+                        print(f"💡 FOG OF WAR LIGHTING: {'ENABLED' if GAME_LIGHT_ENABLED else 'DISABLED'}")
+                        print("="*50)
+                        if GAME_LIGHT_ENABLED:
+                            print("Fog of war effect activated!")
+                            print("Light reveals areas as you explore")
+                            print("Unexplored areas remain in darkness")
+                        else:
+                            print("Full visibility restored!")
+                            print("All areas are clearly visible")
+                            print("Perfect for strategic planning")
+                        print("="*50)
+                    elif event.key == pygame.K_q:
+                        running = False
+            
+            # Auto step
+            if auto_step and current_time - last_step_time >= step_delay:
+                percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
+                agent.perceive(percepts)
+                percepts["bump"] = getattr(agent, "bump", False)
+                percepts["scream"] = env.scream
+
+                # Agent chooses action
+                action = agent.choose_action()
+
+                # Log step
+                log_str = (
+                    f"[Step {step_count + 1}] Action: {action}, "
+                    f"Position: {agent.position}, "
+                    f"Direction: {agent.direction}, "
+                    f"Has Gold: {agent.has_gold}, "
+                    f"Percepts: {percepts}"
+                )
+                print(log_str)
+                # Check if Wumpus will move after this action
+                will_move_wumpus = advance_enabled and (env.action_count + 1) % 5 == 0
+                log_file.write(log_str + "\n")
+
+                # Apply action
+                env.apply_action(agent, action)
+                
+                # Update agent knowledge if Wumpus moved
+                if will_move_wumpus and hasattr(agent, 'update_wumpus_knowledge'):
+                    agent.update_wumpus_knowledge()
+                env.print_state(agent)
+                hunter.move_to(agent.position[0], agent.position[1], agent.direction)
+                if light:
+                    light.update(hunter)
+                step_count += 1
+                last_step_time = current_time
+            
+            # Update sprites
+            all_sprites.update()
+            
+            # Update light with current hunter position
+            if light:
+                light.update(hunter)
+            
+            # Draw everything with proper positioning
+            draw_window(env, agent, all_sprites, light)
+            clock.tick(FPS)
+        
+        # Game over
+        if agent.done:
+            if agent.has_gold and agent.position == (0, 0):
+                game_result = "victory"
+                choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
+            else:
+                game_result = "death"
+                choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
+        elif step_count > 50:
+            game_result = "timeout"
+            choice = display_game_over_screen(env, agent, step_count, advance_enabled, game_result)
+        else:
+            choice = None
+        
+        # Handle post-game choices
+        if choice == 'restart':
+            print("Restarting game...")
+            return 'restart'  # Return restart signal to caller
+        elif choice == 'quit':
+            print("Exiting game...")
+            return 'quit'  # Return quit signal to caller
+        # If choice is 'continue' or None, the game loop continues normally
+        
+        pygame.quit()
+        return 'end'
+
+#Run game in console mode
+def run_game():
+    env = Environment(size=GAME_N, num_wumpus=GAME_NUM_WUMPUS, pit_prob=GAME_PIT_PROB, advance_setting=ADVANCE_SETTING)
+    agent = KBWumpusAgent(env)
+
+    steps = 0
+
+    # Open the file for writing logs
+    with open("game_log.txt", "w") as log_file:
+        while not agent.done and steps < 50:
+            percepts = env.get_percepts(agent.position, bump=getattr(agent, "bump", False))
+            agent.perceive(percepts)
+
+            percepts["bump"] = getattr(agent, "bump", False)
+            percepts["scream"] = env.scream
+            
+
+            action = agent.choose_action()
+
+            # Create the log string
+            log_str = (
+                f"[Step {steps}] Action: {action}, "
+                f"Position: {agent.position}, "
+                f"Direction: {agent.direction}, "
+                f"Has Gold: {agent.has_gold}, "
+                f"Scream: {percepts.get('scream', False)}, "
+                f"Bump: {percepts.get('bump', False)}"
+            )
+
+            print(log_str)
+            log_file.write(log_str + "\n")
+
+            env.apply_action(agent, action)
+            env.print_state(agent)
+            steps += 1
 
 if __name__ == "__main__":
 
