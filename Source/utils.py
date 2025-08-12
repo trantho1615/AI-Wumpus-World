@@ -6,18 +6,19 @@ ASSETS = os.path.join(os.path.dirname(
     __file__), 'assets')
 
 
+# Function to scale images with size provided
 def scale(image, width: int = 30, height: int = 15):
     """Scale the image to the specified width and height."""
     image = pygame.transform.scale(image, (width, height))
     return image
 
-
+# Function to rotate images
 def rotate(image, angle):
     """Rotate the image to the specified angle."""
     image = pygame.transform.rotate(image, angle)
     return image
 
-
+# Get all assets
 def get_assets(folder: str = None, files: str = ''):
     """get all assets with name starting with files... from the specified folder"""
     if folder:
@@ -50,7 +51,7 @@ def generate_pit_positions(grid_size, pit_probability):
     return pit_positions
 
 
-# Calculate positions dynamically based on grid size
+# Calculate pixel positions dynamically based on grid size (NxN) and grid position (0,0) -> (N-1, N-1)
 def generate_positions(grid_size, width=800, height=800):
     """Generate positions for an NxN grid within the given width and height"""
     # Calculate margins - no margins to fill entire window
@@ -93,6 +94,8 @@ def generate_positions(grid_size, width=800, height=800):
     
     return tuple(positions)
 
+
+# Check if positions are correct
 def debug_positions(grid_size, width=800, height=800):
     """Debug function to visualize grid positions"""
     positions = generate_positions(grid_size, width, height)
@@ -122,6 +125,7 @@ def debug_positions(grid_size, width=800, height=800):
     
     return positions
 
+# Load map graphic
 def load_map_tiles():
     """Load all 9 map tiles and return as dictionary"""
     tiles = {}
@@ -155,6 +159,7 @@ def load_map(map_name, grid_size=4, width=800, height=800):
     # Scale tiles to fit grid cells perfectly
     return scale_for_grid(MAP, grid_size, "tile", width, height)
 
+# Scale environment element base on grid_size, use for fitting elements within grid cells
 def calculate_scaling_factor(grid_size, width=800, height=800):
     """Calculate optimal scaling factor based on grid size and cell dimensions"""
     # Calculate cell dimensions
@@ -176,6 +181,7 @@ def calculate_scaling_factor(grid_size, width=800, height=800):
     
     return scale_factor, cell_width, cell_height
 
+# Determine output for each element base on scaling factor
 def scale_for_grid(image, grid_size, asset_type="default", width=800, height=800):
     """Scale image optimally for the given grid size"""
     scale_factor, cell_width, cell_height = calculate_scaling_factor(grid_size, width, height)

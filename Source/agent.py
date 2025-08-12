@@ -2,7 +2,7 @@ from knowledge_base import DynamicKB, breeze_rule, stench_rule
 from planner import astar
 import random
 
-
+# Random Wumpus Agent
 class RandomWumpusAgent:
     def __init__(self, env):
         self.env = env
@@ -28,10 +28,10 @@ class RandomWumpusAgent:
         
         # Create weighted action list with higher probability for move, turn_left, turn_right
         weighted_actions = (
-            ["move"] * 6 +           # 60% probability
-            ["turn_left"] * 2 +      # 20% probability
-            ["turn_right"] * 2 +     # 20% probability
-            ["shoot", "grab", "climb"]  # 10% total for other actions
+            ["move"] * 7 +             # 70% probability
+            ["turn_left"] * 1 +      # 10% probability
+            ["turn_right"] * 1 +     # 10% probability
+            ["shoot", "grab", "climb"] # 10% total for other actions
         )
         return random.choice(weighted_actions)
 
@@ -55,7 +55,7 @@ class RandomWumpusAgent:
     def _turn_right(self, dir):
         return {"N": "E", "E": "S", "S": "W", "W": "N"}[dir]
 
-
+# Knowledge-Based Wumpus Agent
 class KBWumpusAgent:
     def __init__(self, env):
         self.plan = []

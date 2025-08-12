@@ -1,3 +1,4 @@
+# Dynamic Knowledge Base
 class DynamicKB:
     def __init__(self, size=4):
         self.size = size
@@ -42,7 +43,7 @@ class DynamicKB:
                     safe_unvisited.append((x, y))
         return safe_unvisited
 
-
+# Stench Rule
 def stench_rule(facts, size):
     new_facts = set()
 
@@ -72,7 +73,7 @@ def stench_rule(facts, size):
 
     return new_facts
 
-
+# Breeze Rule
 def breeze_rule(facts, size):
     new_facts = set()
     possible_pit_candidates = []

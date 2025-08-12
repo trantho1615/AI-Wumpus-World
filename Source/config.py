@@ -4,6 +4,7 @@ import argparse
 import sys
 from utils import get_assets, rotate, generate_positions, generate_pit_positions, load_map_tiles, scale_for_grid
 
+# Grid size on pixel
 WIDTH = 800
 HEIGHT = 800
 
@@ -19,13 +20,12 @@ def parse_arguments():
         description='Wumpus World AI Game',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  python main.py                    # Default: 8x8 grid, 2 wumpuses, 20% pits, KB agent, GUI
-  python main.py 4                  # 4x4 grid with defaults
-  python main.py 4 1 0.01           # 4x4 grid, 1 wumpus, 1% pits
-  python main.py 6 3 0.15 -r        # 6x6 grid, 3 wumpuses, 15% pits, random agent
-  python main.py 4 1 0.01 -a --console  # 4x4 grid, KB agent, console mode
-  python main.py 8 2 0.2 --no-light     # Default game with lighting disabled
+        Examples:
+        python main.py                    # Default: 8x8 grid, 2 wumpuses, 20% pits, KB agent, GUI
+        python main.py 4                  # 4x4 grid with defaults
+        python main.py 4 1 0.01           # 4x4 grid, 1 wumpus, 1% pits
+        python main.py 6 3 0.15 -r        # 6x6 grid, 3 wumpuses, 15% pits, random agent
+        python main.py 4 1 0.01 -a --console  # 4x4 grid, KB agent, console mode
         """
     )
     
@@ -91,6 +91,8 @@ print(f"Moving Wumpus Module (Advance Setting): {'ON' if ADVANCE_SETTING else 'O
 POSITIONS = generate_positions(N)
 print(POSITIONS)
 
+
+#ASSETS
 ASSETS = os.path.join(os.path.dirname(
     __file__), 'assets')
 
