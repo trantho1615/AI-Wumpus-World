@@ -557,8 +557,8 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
         WIN.blit(subtitle_surface, subtitle_rect)
         
         # Statistics panel
-        stats_y_start = HEIGHT//2 - 50
-        stats_spacing = 40
+        stats_y_start = HEIGHT//2 - 70
+        stats_spacing = 35
         
         # Performance rating
         perf_text = f"Performance: {performance}"
@@ -574,6 +574,7 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
             f"Grid Size: {env.size}x{env.size}",
             f"Total Actions: {total_actions}",
             f"Arrows Remaining: {arrows_remaining}/1",
+            f"Wumpus Killed: {1 if env.wumpus_killed else 0}",
             f"Cells Explored: {cells_explored}/{total_cells} ({exploration_percentage:.1f}%)",
         ]
         
@@ -611,6 +612,7 @@ def display_game_over_screen(env, agent, step_count, advance_enabled, game_resul
     print(f"Final Score: {final_score:,}")
     print(f"Total Actions Taken: {total_actions}")
     print(f"Arrows Remaining: {arrows_remaining}/1")
+    print(f"Wumpus Killed: {1 if env.wumpus_killed else 0}")
     print(f"Cells Explored: {cells_explored}/{total_cells} ({exploration_percentage:.1f}%)")
     
     if hasattr(agent, 'has_gold') and agent.has_gold:

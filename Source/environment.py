@@ -19,6 +19,7 @@ class Environment:
         self.scream = False
         self.gold_found = False
         self.death_cause = None  # Track specific death cause
+        self.wumpus_killed = False  # Track if any Wumpus was killed
         # Advanced: Moving Wumpus Module
         self.advance_setting = advance_setting
         self.action_count = 0
@@ -131,6 +132,7 @@ class Environment:
                     if (tx, ty) in self.wumpus_positions:
                         self.wumpus_positions.remove((tx, ty))
                     self.scream = True
+                    self.wumpus_killed = True  # Track that a Wumpus was killed
                     print(f">>> Wumpus at ({tx},{ty}) has been eliminated!")
                     
                     # Play scream sound immediately when Wumpus is killed
